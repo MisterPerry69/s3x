@@ -1,0 +1,233 @@
+<!doctype html>
+<html lang="it">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#8372f2" />
+    <title>Luma</title>
+    <link rel="manifest" href="manifest.webmanifest" />
+    <link rel="icon" href="icon.svg" />
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <button class="icon-button" id="privacyToggle" type="button" aria-label="Nascondi dati">
+          <span data-icon="eye"></span>
+        </button>
+        <div>
+          <p class="eyebrow">Diario privato</p>
+          <h1>Luma</h1>
+        </div>
+        <button class="icon-button" id="quickAddButton" type="button" aria-label="Aggiungi incontro">
+          <span data-icon="plus"></span>
+        </button>
+      </header>
+
+      <main>
+        <section class="view active" id="view-dashboard" aria-label="Dashboard">
+          <div class="hero-panel">
+            <div>
+              <p class="eyebrow">Questo mese</p>
+              <strong id="monthCount">0</strong>
+              <span>incontri registrati</span>
+            </div>
+            <div class="sparkline" id="sparkline" aria-hidden="true"></div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card">
+              <span data-icon="users"></span>
+              <p>Partner</p>
+              <strong id="partnerCount">0</strong>
+            </article>
+            <article class="metric-card">
+              <span data-icon="shield"></span>
+              <p>Protetti</p>
+              <strong id="safeRate">0%</strong>
+            </article>
+            <article class="metric-card">
+              <span data-icon="heart"></span>
+              <p>Media mood</p>
+              <strong id="moodAverage">-</strong>
+            </article>
+            <article class="metric-card">
+              <span data-icon="calendar"></span>
+              <p>Ultimo</p>
+              <strong id="lastDate">-</strong>
+            </article>
+          </div>
+
+          <section class="content-block">
+            <div class="section-heading">
+              <h2>Recenti</h2>
+              <button class="text-button" data-tab-target="log" type="button">Vedi tutto</button>
+            </div>
+            <div class="timeline" id="recentList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-log" aria-label="Registro">
+          <div class="section-heading">
+            <h2>Registro</h2>
+            <button class="primary-button" id="addEncounterButton" type="button">
+              <span data-icon="plus"></span>
+              Nuovo
+            </button>
+          </div>
+          <div class="filter-row">
+            <input id="searchInput" type="search" placeholder="Cerca partner, tag o note" />
+            <select id="filterPartner">
+              <option value="">Tutti</option>
+            </select>
+          </div>
+          <div class="timeline" id="encounterList"></div>
+        </section>
+
+        <section class="view" id="view-partners" aria-label="Partner">
+          <div class="section-heading">
+            <h2>Partner</h2>
+            <button class="primary-button" id="addPartnerButton" type="button">
+              <span data-icon="plus"></span>
+              Nuovo
+            </button>
+          </div>
+          <div class="partner-grid" id="partnerList"></div>
+        </section>
+
+        <section class="view" id="view-calendar" aria-label="Calendario">
+          <div class="calendar-header">
+            <button class="icon-button" id="prevMonth" type="button" aria-label="Mese precedente">
+              <span data-icon="left"></span>
+            </button>
+            <h2 id="calendarTitle"></h2>
+            <button class="icon-button" id="nextMonth" type="button" aria-label="Mese successivo">
+              <span data-icon="right"></span>
+            </button>
+          </div>
+          <div class="calendar-grid" id="calendarGrid"></div>
+          <section class="content-block">
+            <div class="section-heading compact">
+              <div>
+                <p class="eyebrow">Giorno selezionato</p>
+                <h2 id="selectedDayTitle"></h2>
+              </div>
+              <button class="icon-button add-day-button" id="addForSelectedDay" type="button" aria-label="Aggiungi evento in questa data">
+                <span data-icon="plus"></span>
+              </button>
+            </div>
+            <div class="timeline" id="dayList"></div>
+          </section>
+        </section>
+
+        <section class="view" id="view-notes" aria-label="Note">
+          <div class="section-heading">
+            <h2>Note</h2>
+            <button class="primary-button" id="saveNoteButton" type="button">
+              <span data-icon="save"></span>
+              Salva
+            </button>
+          </div>
+          <textarea id="notesArea" placeholder="Preferenze, confini, cose da ricordare, test, check-in emotivi..."></textarea>
+          <div class="settings-panel">
+            <button class="text-button" id="exportButton" type="button">Esporta dati</button>
+            <label class="import-label">
+              Importa dati
+              <input id="importInput" type="file" accept="application/json" />
+            </label>
+            <button class="danger-button" id="wipeButton" type="button">Cancella tutto</button>
+          </div>
+        </section>
+      </main>
+
+      <nav class="tabbar" aria-label="Navigazione principale">
+        <button class="tab active" data-tab="dashboard" type="button">
+          <span data-icon="home"></span>
+          <span>Home</span>
+        </button>
+        <button class="tab" data-tab="log" type="button">
+          <span data-icon="list"></span>
+          <span>Log</span>
+        </button>
+        <button class="tab" data-tab="partners" type="button">
+          <span data-icon="users"></span>
+          <span>Partner</span>
+        </button>
+        <button class="tab" data-tab="calendar" type="button">
+          <span data-icon="calendar"></span>
+          <span>Agenda</span>
+        </button>
+        <button class="tab" data-tab="notes" type="button">
+          <span data-icon="note"></span>
+          <span>Note</span>
+        </button>
+      </nav>
+    </div>
+
+    <dialog id="entryDialog">
+      <form method="dialog" id="entryForm">
+        <div class="dialog-heading">
+          <h2 id="dialogTitle">Nuovo incontro</h2>
+          <button class="icon-button" id="closeDialogButton" type="button" aria-label="Chiudi">
+            <span data-icon="x"></span>
+          </button>
+        </div>
+        <input type="hidden" id="entryId" />
+        <label>
+          Tipo
+          <select id="entryType">
+            <option value="encounter">Incontro</option>
+            <option value="partner">Partner</option>
+          </select>
+        </label>
+        <div id="partnerFields" class="form-stack hidden">
+          <label>
+            Nome o alias
+            <input id="partnerName" type="text" autocomplete="off" />
+          </label>
+          <label>
+            Vibe / tag
+            <input id="partnerTags" type="text" placeholder="dolce, casual, ex..." autocomplete="off" />
+          </label>
+          <label>
+            Note
+            <textarea id="partnerNotes" rows="3"></textarea>
+          </label>
+        </div>
+        <div id="encounterFields" class="form-stack">
+          <label>
+            Data
+            <input id="encounterDate" type="date" />
+          </label>
+          <label>
+            Partner
+            <select id="encounterPartner"></select>
+          </label>
+          <label>
+            Mood
+            <input id="encounterMood" type="range" min="1" max="5" value="4" />
+          </label>
+          <div class="segmented" id="protectedGroup" role="group" aria-label="Protezione">
+            <button type="button" data-safe="yes" class="active">Protetto</button>
+            <button type="button" data-safe="no">Non protetto</button>
+            <button type="button" data-safe="na">N/A</button>
+          </div>
+          <label>
+            Tag
+            <input id="encounterTags" type="text" placeholder="romantico, aftercare, quick..." autocomplete="off" />
+          </label>
+          <label>
+            Note
+            <textarea id="encounterNotes" rows="4"></textarea>
+          </label>
+        </div>
+        <menu>
+          <button class="danger-button hidden" id="deleteEntryButton" type="button">Elimina</button>
+          <button class="primary-button" id="saveEntryButton" value="default" type="submit">Salva</button>
+        </menu>
+      </form>
+    </dialog>
+
+    <script src="app.js"></script>
+  </body>
+</html>
