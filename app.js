@@ -21,19 +21,26 @@ const demoData = {
   partners: [
     {
       id: crypto.randomUUID(),
-      name: "S.",
+      name: "Sofia",
+      alias: "S.",
+      firstDate: toInputDate(addDays(new Date(), -55)),
+      photo: "",
       tags: ["dolce", "ongoing"],
       notes: "Ama messaggi chiari e aftercare tranquillo.",
     },
     {
       id: crypto.randomUUID(),
-      name: "M.",
+      name: "Marta",
+      alias: "M.",
+      firstDate: toInputDate(addDays(new Date(), -30)),
+      photo: "",
       tags: ["casual"],
       notes: "Preferisce organizzare con anticipo.",
     },
   ],
   encounters: [],
   notes: "Confini da rispettare, test periodici, cose che mi fanno stare bene.",
+  profilePhoto: "",
 };
 
 const today = new Date();
@@ -52,7 +59,7 @@ demoData.encounters = [
     date: toInputDate(addDays(today, -9)),
     partnerId: demoData.partners[1].id,
     mood: 3,
-    safe: "na",
+    safe: "no",
     tags: ["drink"],
     notes: "Divertente, ma ero un po' stanca.",
   },
@@ -72,7 +79,7 @@ let activeTab = "dashboard";
 let selectedSafe = "yes";
 let selectedDate = toInputDate(new Date());
 let calendarCursor = new Date();
-let privacyOn = false;
+let partnerPhotoData = "";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -98,20 +105,23 @@ function wireEvents() {
   $("#quickAddButton").addEventListener("click", () => openEncounterDialog());
   $("#addEncounterButton").addEventListener("click", () => openEncounterDialog());
   $("#addPartnerButton").addEventListener("click", () => openPartnerDialog());
-  $("#entryType").addEventListener("change", syncDialogMode);
   $("#closeDialogButton").addEventListener("click", () => $("#entryDialog").close());
   $("#entryForm").addEventListener("submit", saveEntry);
   $("#deleteEntryButton").addEventListener("click", deleteCurrentEntry);
+  $("#partnerPhoto").addEventListener("change", handlePartnerPhoto);
+  $("#encounterPartnerName").addEventListener("input", updateNewPartnerHint);
   $("#searchInput").addEventListener("input", renderLists);
   $("#filterPartner").addEventListener("change", renderLists);
   $("#prevMonth").addEventListener("click", () => shiftMonth(-1));
   $("#nextMonth").addEventListener("click", () => shiftMonth(1));
   $("#addForSelectedDay").addEventListener("click", () => openEncounterDialog("", selectedDate));
-  $("#saveNoteButton").addEventListener("click", saveNotes);
+  $("#statsScope").addEventListener("change", renderStats);
+  $("#statsMonth").addEventListener("change", renderStats);
+  $("#statsYear").addEventListener("change", renderStats);
+  $("#profilePhoto").addEventListener("change", handleProfilePhoto);
   $("#exportButton").addEventListener("click", exportData);
   $("#importInput").addEventListener("change", importData);
   $("#wipeButton").addEventListener("click", wipeData);
-  $("#privacyToggle").addEventListener("click", togglePrivacy);
 
   $$("#protectedGroup button").forEach((button) => {
     button.addEventListener("click", () => {
@@ -119,6 +129,8 @@ function wireEvents() {
       $$("#protectedGroup button").forEach((item) => item.classList.toggle("active", item === button));
     });
   });
+
+  buildStarRating();
 }
 
 function loadState() {
@@ -131,9 +143,10 @@ function loadState() {
   try {
     const parsed = JSON.parse(saved);
     return {
-      partners: parsed.partners || [],
+      partners: normalizePartners(parsed.partners || []),
       encounters: parsed.encounters || [],
       notes: parsed.notes || "",
+      profilePhoto: parsed.profilePhoto || "",
     };
   } catch {
     return structuredClone(demoData);
@@ -144,14 +157,27 @@ function saveState(nextState = state) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
 }
 
+function normalizePartners(partners) {
+  return partners.map((partner) => ({
+    id: partner.id || crypto.randomUUID(),
+    name: partner.name || partner.alias || "Senza nome",
+    alias: partner.alias || "",
+    firstDate: partner.firstDate || "",
+    photo: partner.photo || "",
+    tags: partner.tags || [],
+    notes: partner.notes || "",
+  }));
+}
+
 function render() {
   renderPartnerOptions();
   renderDashboard();
   renderLists();
   renderPartners();
   renderCalendar();
-  $("#notesArea").value = state.notes || "";
-  document.body.classList.toggle("privacy", privacyOn);
+  renderStats();
+  renderProfilePhoto();
+  document.body.dataset.tab = activeTab;
 }
 
 function renderDashboard() {
@@ -185,12 +211,111 @@ function renderDashboard() {
   bindEventCards();
 }
 
+function renderStats() {
+  const now = new Date();
+  if (!$("#statsMonth").value) $("#statsMonth").value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  if (!$("#statsYear").value) $("#statsYear").value = now.getFullYear();
+
+  const scope = $("#statsScope").value;
+  const items = encountersForStats(scope);
+  const partners = new Set(items.map((item) => item.partnerId));
+  const safeItems = items.filter((item) => item.safe === "yes" || item.safe === "no");
+  const safeRate = safeItems.length
+    ? Math.round((safeItems.filter((item) => item.safe === "yes").length / safeItems.length) * 100)
+    : 0;
+  const moodAverage = items.length
+    ? (items.reduce((sum, item) => sum + Number(item.mood || 0), 0) / items.length).toFixed(1)
+    : "-";
+  const firstTimes = items.filter((item) => isFirstEncounter(item)).length;
+
+  $("#statsMonth").classList.toggle("hidden", scope !== "month");
+  $("#statsYear").classList.toggle("hidden", scope !== "year");
+  $("#profileSubtitle").textContent = `${items.length} incontri nel periodo selezionato`;
+  $("#statsGrid").innerHTML = [
+    statCard("Incontri", items.length),
+    statCard("Partner", partners.size),
+    statCard("Mood medio", moodAverage),
+    statCard("Protetti", `${safeRate}%`),
+    statCard("Prime volte", firstTimes),
+    statCard("Tag diversi", uniqueTags(items).size),
+  ].join("");
+
+  renderTopPartners(items);
+  renderMoodChart(items);
+}
+
+function encountersForStats(scope) {
+  if (scope === "all") return sortedEncounters();
+
+  if (scope === "year") {
+    const year = Number($("#statsYear").value || new Date().getFullYear());
+    return sortedEncounters().filter((item) => parseDate(item.date).getFullYear() === year);
+  }
+
+  const [year, month] = $("#statsMonth").value.split("-").map(Number);
+  return sortedEncounters().filter((item) => {
+    const date = parseDate(item.date);
+    return date.getFullYear() === year && date.getMonth() === month - 1;
+  });
+}
+
+function statCard(label, value) {
+  return `
+    <article class="metric-card stat-card">
+      <p>${label}</p>
+      <strong>${value}</strong>
+    </article>
+  `;
+}
+
+function uniqueTags(items) {
+  return new Set(items.flatMap((item) => item.tags || []));
+}
+
+function renderTopPartners(items) {
+  const counts = items.reduce((map, item) => {
+    map.set(item.partnerId, (map.get(item.partnerId) || 0) + 1);
+    return map;
+  }, new Map());
+  const rows = [...counts.entries()]
+    .map(([partnerId, count]) => ({ partner: getPartner(partnerId), count }))
+    .filter((row) => row.partner)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 5);
+  const max = Math.max(...rows.map((row) => row.count), 1);
+
+  $("#topPartners").innerHTML =
+    rows
+      .map(
+        (row) => `
+          <div class="bar-row">
+            <span>${escapeHtml(partnerLabel(row.partner))}</span>
+            <strong>${row.count}</strong>
+            <div><i style="width:${(row.count / max) * 100}%"></i></div>
+          </div>
+        `,
+      )
+      .join("") || emptyState("Nessun dato nel periodo.");
+}
+
+function renderMoodChart(items) {
+  const chronological = [...items].sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
+  const max = 5;
+  $("#moodChart").innerHTML =
+    chronological
+      .map((item) => {
+        const height = Math.max(8, (Number(item.mood || 0) / max) * 100);
+        return `<span style="height:${height}%" title="${shortDate(item.date)}"></span>`;
+      })
+      .join("") || emptyState("Aggiungi incontri per vedere il trend.");
+}
+
 function renderLists() {
   const query = $("#searchInput").value?.trim().toLowerCase() || "";
   const partnerFilter = $("#filterPartner").value;
   const items = sortedEncounters().filter((item) => {
     const partner = getPartner(item.partnerId);
-    const haystack = [partner?.name, item.notes, ...(item.tags || [])].join(" ").toLowerCase();
+    const haystack = [partner?.name, partner?.alias, item.notes, ...(item.tags || [])].join(" ").toLowerCase();
     return (!partnerFilter || item.partnerId === partnerFilter) && (!query || haystack.includes(query));
   });
 
@@ -209,8 +334,15 @@ function renderPartners() {
             <button class="edit-chip" data-edit-partner="${partner.id}" type="button" aria-label="Modifica partner">
               ${icons.pencil}
             </button>
-            <strong class="private-text">${escapeHtml(partner.name)}</strong>
+            <div class="partner-row">
+              ${avatarHtml(partner)}
+              <div>
+                <strong class="private-text">${escapeHtml(partner.name)}</strong>
+                ${partner.alias ? `<p class="meta private-text">${escapeHtml(partner.alias)}</p>` : ""}
+              </div>
+            </div>
             <p class="meta">${count} incontri${last ? `, ultimo ${shortDate(last.date)}` : ""}</p>
+            ${partner.firstDate ? `<p class="meta">Prima volta: ${shortDate(partner.firstDate)}</p>` : ""}
             <div class="tag-row">${tagsHtml(partner.tags)}</div>
             ${partner.notes ? `<p class="private-text">${escapeHtml(partner.notes)}</p>` : ""}
           </article>
@@ -263,27 +395,34 @@ function renderCalendar() {
 }
 
 function renderPartnerOptions() {
-  const options = state.partners.map((partner) => `<option value="${partner.id}">${escapeHtml(partner.name)}</option>`).join("");
-  $("#encounterPartner").innerHTML = options || '<option value="">Aggiungi prima un partner</option>';
-  $("#filterPartner").innerHTML = '<option value="">Tutti</option>' + options;
+  const selectOptions = state.partners
+    .map((partner) => `<option value="${partner.id}">${escapeHtml(partnerLabel(partner))}</option>`)
+    .join("");
+  const suggestions = state.partners
+    .map((partner) => `<option value="${escapeHtml(partnerLabel(partner))}"></option>`)
+    .join("");
+  $("#filterPartner").innerHTML = '<option value="">Tutti</option>' + selectOptions;
+  $("#partnerSuggestions").innerHTML = suggestions;
 }
 
 function eventCard(item) {
   const partner = getPartner(item.partnerId);
-  const safeText = item.safe === "yes" ? "Protetto" : item.safe === "no" ? "Non protetto" : "N/A";
+  const safeText = item.safe === "yes" ? "Protetto" : "Non protetto";
   const safeClass = item.safe === "yes" ? "safe" : item.safe === "no" ? "risk" : "";
+  const isFirst = isFirstEncounter(item);
   return `
     <article class="event-card">
       <button class="edit-chip" data-edit-encounter="${item.id}" type="button" aria-label="Modifica incontro">
         ${icons.pencil}
       </button>
       <div class="event-top">
-        <strong class="private-text">${escapeHtml(partner?.name || "Senza nome")}</strong>
+        <strong class="private-text">${escapeHtml(partner ? partnerLabel(partner) : "Senza nome")}</strong>
         <span class="meta">${shortDate(item.date)}</span>
       </div>
       <div class="tag-row">
+        ${isFirst ? '<span class="pill first-time">Prima volta</span>' : ""}
         <span class="pill ${safeClass}">${safeText}</span>
-        <span class="pill">Mood ${"★".repeat(Number(item.mood || 0))}</span>
+        <span class="pill">Mood ${moodStars(Number(item.mood || 0))}</span>
         ${tagsHtml(item.tags)}
       </div>
       ${item.notes ? `<p class="private-text">${escapeHtml(item.notes)}</p>` : ""}
@@ -299,10 +438,116 @@ function emptyState(text) {
   return `<p class="empty">${text}</p>`;
 }
 
+function avatarHtml(partner) {
+  if (partner.photo) {
+    return `<img class="avatar" src="${partner.photo}" alt="" />`;
+  }
+
+  return `<span class="avatar">${escapeHtml((partner.alias || partner.name || "?").slice(0, 1).toUpperCase())}</span>`;
+}
+
+function partnerLabel(partner) {
+  return partner.alias ? `${partner.name} (${partner.alias})` : partner.name;
+}
+
+function findPartnerByName(value) {
+  const needle = value.trim().toLowerCase();
+  return state.partners.find((partner) => {
+    const labels = [partner.name, partner.alias, partnerLabel(partner)].filter(Boolean).map((item) => item.toLowerCase());
+    return labels.includes(needle);
+  });
+}
+
+function isFirstEncounter(item) {
+  const partnerItems = sortedEncounters().filter((encounter) => encounter.partnerId === item.partnerId);
+  return partnerItems.length > 0 && partnerItems[partnerItems.length - 1].id === item.id;
+}
+
+function moodStars(value) {
+  const full = Math.floor(value);
+  const half = value % 1 >= 0.5;
+  return `${"★".repeat(full)}${half ? "½" : ""}${value === 0 ? "0" : ""}`;
+}
+
 function bindEventCards() {
   $$("[data-edit-encounter]").forEach((button) => {
     button.addEventListener("click", () => openEncounterDialog(button.dataset.editEncounter));
   });
+}
+
+function buildStarRating() {
+  const zero = '<button type="button" data-mood="0" aria-label="Mood 0">0</button>';
+  $("#starRating").innerHTML = zero + Array.from({ length: 10 }, (_, index) => {
+    const value = (index + 1) / 2;
+    const label = value % 1 === 0 ? `${value}` : `${Math.floor(value)}.5`;
+    return `<button type="button" data-mood="${value}" aria-label="Mood ${label}">★</button>`;
+  }).join("");
+
+  $$("#starRating button").forEach((button) => {
+    button.addEventListener("click", () => {
+      $("#encounterMood").value = button.dataset.mood;
+      updateStarRating();
+    });
+  });
+}
+
+function updateStarRating() {
+  const mood = Number($("#encounterMood").value || 0);
+  $$("#starRating button").forEach((button) => {
+    button.classList.toggle("active", Number(button.dataset.mood) <= mood);
+    button.classList.toggle("half-step", Number(button.dataset.mood) % 1 !== 0);
+  });
+  $("#moodValue").textContent = `${mood.toFixed(mood % 1 ? 1 : 0)} / 5`;
+}
+
+function updateNewPartnerHint() {
+  const value = $("#encounterPartnerName").value.trim();
+  if (!value) {
+    $("#newPartnerHint").textContent = "";
+    return;
+  }
+
+  $("#newPartnerHint").textContent = findPartnerByName(value)
+    ? "Partner già presente"
+    : "Nuovo partner: verrà aggiunto salvando l'incontro";
+}
+
+function handlePartnerPhoto(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    partnerPhotoData = String(reader.result || "");
+    renderPhotoPreview();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderPhotoPreview() {
+  $("#partnerPhotoPreview").innerHTML = partnerPhotoData
+    ? `<img src="${partnerPhotoData}" alt="" />`
+    : icons.users;
+}
+
+function handleProfilePhoto(event) {
+  const file = event.target.files?.[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = () => {
+    state.profilePhoto = String(reader.result || "");
+    saveState();
+    renderProfilePhoto();
+  };
+  reader.readAsDataURL(file);
+}
+
+function renderProfilePhoto() {
+  $(".profile-avatar").innerHTML = state.profilePhoto
+    ? `<img src="${state.profilePhoto}" alt="" /><input id="profilePhoto" type="file" accept="image/*" />`
+    : `${icons.heart}<input id="profilePhoto" type="file" accept="image/*" />`;
+  $("#profilePhoto").addEventListener("change", handleProfilePhoto);
 }
 
 function setTab(tab) {
@@ -310,29 +555,29 @@ function setTab(tab) {
   $$(".tab").forEach((button) => button.classList.toggle("active", button.dataset.tab === tab));
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${tab}`));
   if (tab === "calendar") renderCalendar();
+  if (tab === "profile") renderStats();
+  document.body.dataset.tab = tab;
 }
 
 function openEncounterDialog(id = "", date = "") {
-  if (!state.partners.length) {
-    openPartnerDialog();
-    return;
-  }
-
   $("#entryType").value = "encounter";
   $("#dialogTitle").textContent = id ? "Modifica incontro" : "Nuovo incontro";
   $("#entryId").value = id;
   syncDialogMode();
 
   const item = state.encounters.find((encounter) => encounter.id === id);
+  const partner = item ? getPartner(item.partnerId) : null;
   $("#encounterDate").value = item?.date || date || selectedDate || toInputDate(new Date());
-  $("#encounterPartner").value = item?.partnerId || state.partners[0]?.id || "";
+  $("#encounterPartnerName").value = partner ? partnerLabel(partner) : "";
   $("#encounterMood").value = item?.mood || 4;
   $("#encounterTags").value = (item?.tags || []).join(", ");
   $("#encounterNotes").value = item?.notes || "";
-  selectedSafe = item?.safe || "yes";
+  selectedSafe = item?.safe === "no" ? "no" : "yes";
   $$("#protectedGroup button").forEach((button) => {
     button.classList.toggle("active", button.dataset.safe === selectedSafe);
   });
+  updateStarRating();
+  updateNewPartnerHint();
   $("#deleteEntryButton").classList.toggle("hidden", !id);
   $("#entryDialog").showModal();
 }
@@ -344,9 +589,14 @@ function openPartnerDialog(id = "") {
   syncDialogMode();
 
   const partner = state.partners.find((item) => item.id === id);
+  partnerPhotoData = partner?.photo || "";
   $("#partnerName").value = partner?.name || "";
+  $("#partnerAlias").value = partner?.alias || "";
+  $("#partnerFirstDate").value = partner?.firstDate || "";
   $("#partnerTags").value = (partner?.tags || []).join(", ");
   $("#partnerNotes").value = partner?.notes || "";
+  $("#partnerPhoto").value = "";
+  renderPhotoPreview();
   $("#deleteEntryButton").classList.toggle("hidden", !id);
   $("#entryDialog").showModal();
 }
@@ -368,16 +618,34 @@ function saveEntry(event) {
     const payload = {
       id: id || crypto.randomUUID(),
       name,
+      alias: $("#partnerAlias").value.trim(),
+      firstDate: $("#partnerFirstDate").value,
+      photo: partnerPhotoData,
       tags: splitTags($("#partnerTags").value),
       notes: $("#partnerNotes").value.trim(),
     };
     state.partners = id ? state.partners.map((item) => (item.id === id ? payload : item)) : [payload, ...state.partners];
   } else {
-    if (!$("#encounterPartner").value) return;
+    const partnerName = $("#encounterPartnerName").value.trim();
+    if (!partnerName) return;
+    let partner = findPartnerByName(partnerName);
+    if (!partner) {
+      partner = {
+        id: crypto.randomUUID(),
+        name: partnerName,
+        alias: "",
+        firstDate: $("#encounterDate").value || toInputDate(new Date()),
+        photo: "",
+        tags: [],
+        notes: "",
+      };
+      state.partners = [partner, ...state.partners];
+    }
+
     const payload = {
       id: id || crypto.randomUUID(),
       date: $("#encounterDate").value || toInputDate(new Date()),
-      partnerId: $("#encounterPartner").value,
+      partnerId: partner.id,
       mood: Number($("#encounterMood").value),
       safe: selectedSafe,
       tags: splitTags($("#encounterTags").value),
@@ -410,15 +678,6 @@ function deleteCurrentEntry() {
   render();
 }
 
-function saveNotes() {
-  state.notes = $("#notesArea").value;
-  saveState();
-  $("#saveNoteButton").textContent = "Salvato";
-  setTimeout(() => {
-    $("#saveNoteButton").innerHTML = `${icons.save} Salva`;
-  }, 900);
-}
-
 function exportData() {
   const blob = new Blob([JSON.stringify(state, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
@@ -438,9 +697,10 @@ function importData(event) {
     try {
       const imported = JSON.parse(reader.result);
       state = {
-        partners: imported.partners || [],
+        partners: normalizePartners(imported.partners || []),
         encounters: imported.encounters || [],
         notes: imported.notes || "",
+        profilePhoto: imported.profilePhoto || "",
       };
       saveState();
       render();
@@ -453,14 +713,9 @@ function importData(event) {
 
 function wipeData() {
   if (!confirm("Cancellare tutti i dati salvati su questo dispositivo?")) return;
-  state = { partners: [], encounters: [], notes: "" };
+  state = { partners: [], encounters: [], notes: "", profilePhoto: "" };
   saveState();
   render();
-}
-
-function togglePrivacy() {
-  privacyOn = !privacyOn;
-  document.body.classList.toggle("privacy", privacyOn);
 }
 
 function shiftMonth(delta) {

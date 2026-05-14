@@ -1,6 +1,6 @@
 {
-  "name": "Luma",
-  "short_name": "Luma",
+  "name": "s3x",
+  "short_name": "s3x",
   "description": "Diario privato personale",
   "start_url": ".",
   "display": "standalone",

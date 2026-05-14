@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#8372f2" />
-    <title>s3x</title>
+    <title>Luma</title>
     <link rel="manifest" href="manifest.webmanifest" />
     <link rel="icon" href="icon.svg" />
     <link rel="stylesheet" href="styles.css" />
@@ -12,12 +12,9 @@
   <body>
     <div class="app-shell">
       <header class="topbar">
-        <button class="icon-button" id="privacyToggle" type="button" aria-label="Nascondi dati">
-          <span data-icon="eye"></span>
-        </button>
         <div>
           <p class="eyebrow">Diario privato</p>
-          <h1>s3x</h1>
+          <h1>Luma</h1>
         </div>
         <button class="icon-button" id="quickAddButton" type="button" aria-label="Aggiungi incontro">
           <span data-icon="plus"></span>
@@ -120,15 +117,43 @@
           </section>
         </section>
 
-        <section class="view" id="view-notes" aria-label="Note">
+        <section class="view" id="view-profile" aria-label="Profilo">
           <div class="section-heading">
-            <h2>Note</h2>
-            <button class="primary-button" id="saveNoteButton" type="button">
-              <span data-icon="save"></span>
-              Salva
-            </button>
+            <h2>Profilo</h2>
           </div>
-          <textarea id="notesArea" placeholder="Preferenze, confini, cose da ricordare, test, check-in emotivi..."></textarea>
+          <section class="profile-card">
+            <label class="profile-avatar">
+              <span data-icon="heart"></span>
+              <input id="profilePhoto" type="file" accept="image/*" />
+            </label>
+            <div>
+              <p class="eyebrow">Statistiche personali</p>
+              <h2 id="profileTitle">Il tuo archivio</h2>
+              <p class="meta" id="profileSubtitle"></p>
+            </div>
+          </section>
+          <div class="stats-controls">
+            <select id="statsScope">
+              <option value="month">Mese</option>
+              <option value="year">Anno</option>
+              <option value="all">Totale</option>
+            </select>
+            <input id="statsMonth" type="month" />
+            <input id="statsYear" type="number" min="1970" max="2100" />
+          </div>
+          <div class="metric-grid" id="statsGrid"></div>
+          <section class="content-block">
+            <div class="section-heading">
+              <h2>Partner più presenti</h2>
+            </div>
+            <div class="bar-list" id="topPartners"></div>
+          </section>
+          <section class="content-block">
+            <div class="section-heading">
+              <h2>Trend mood</h2>
+            </div>
+            <div class="wide-chart" id="moodChart"></div>
+          </section>
           <div class="settings-panel">
             <button class="text-button" id="exportButton" type="button">Esporta dati</button>
             <label class="import-label">
@@ -157,9 +182,9 @@
           <span data-icon="calendar"></span>
           <span>Agenda</span>
         </button>
-        <button class="tab" data-tab="notes" type="button">
+        <button class="tab" data-tab="profile" type="button">
           <span data-icon="note"></span>
-          <span>Note</span>
+          <span>Profilo</span>
         </button>
       </nav>
     </div>
@@ -173,17 +198,24 @@
           </button>
         </div>
         <input type="hidden" id="entryId" />
-        <label>
-          Tipo
-          <select id="entryType">
-            <option value="encounter">Incontro</option>
-            <option value="partner">Partner</option>
-          </select>
-        </label>
+        <input type="hidden" id="entryType" />
         <div id="partnerFields" class="form-stack hidden">
+          <label class="photo-field">
+            Foto
+            <span class="photo-preview" id="partnerPhotoPreview"><span data-icon="users"></span></span>
+            <input id="partnerPhoto" type="file" accept="image/*" />
+          </label>
           <label>
-            Nome o alias
+            Nome
             <input id="partnerName" type="text" autocomplete="off" />
+          </label>
+          <label>
+            Alias
+            <input id="partnerAlias" type="text" autocomplete="off" />
+          </label>
+          <label>
+            Prima volta
+            <input id="partnerFirstDate" type="date" />
           </label>
           <label>
             Vibe / tag
@@ -201,16 +233,19 @@
           </label>
           <label>
             Partner
-            <select id="encounterPartner"></select>
+            <input id="encounterPartnerName" list="partnerSuggestions" type="text" placeholder="Nome o alias" autocomplete="off" />
+            <datalist id="partnerSuggestions"></datalist>
+            <span class="helper-text" id="newPartnerHint"></span>
           </label>
           <label>
             Mood
-            <input id="encounterMood" type="range" min="1" max="5" value="4" />
+            <input id="encounterMood" type="hidden" value="4" />
+            <div class="star-rating" id="starRating" role="group" aria-label="Mood"></div>
+            <span class="helper-text" id="moodValue">4 / 5</span>
           </label>
           <div class="segmented" id="protectedGroup" role="group" aria-label="Protezione">
             <button type="button" data-safe="yes" class="active">Protetto</button>
             <button type="button" data-safe="no">Non protetto</button>
-            <button type="button" data-safe="na">N/A</button>
           </div>
           <label>
             Tag

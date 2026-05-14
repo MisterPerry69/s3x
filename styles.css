@@ -68,6 +68,10 @@ menu,
   margin-bottom: 18px;
 }
 
+body:not([data-tab="dashboard"]) .topbar {
+  display: none;
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: var(--violet);
@@ -300,6 +304,31 @@ h2 {
   padding-right: 42px;
 }
 
+.partner-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-right: 42px;
+}
+
+.avatar {
+  display: grid;
+  width: 54px;
+  height: 54px;
+  flex: 0 0 54px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 20px;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--aqua), var(--violet));
+  font-weight: 900;
+}
+
+img.avatar,
+.photo-preview img {
+  object-fit: cover;
+}
+
 .edit-chip {
   position: absolute;
   top: 12px;
@@ -346,6 +375,11 @@ h2 {
   background: rgba(255, 111, 127, 0.15);
 }
 
+.pill.first-time {
+  color: #8a4a00;
+  background: rgba(255, 189, 92, 0.28);
+}
+
 .filter-row {
   align-items: stretch;
   margin-bottom: 12px;
@@ -379,8 +413,99 @@ textarea {
 }
 
 .partner-card strong {
-  padding-right: 42px;
   font-size: 1.22rem;
+}
+
+.profile-card {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+  padding: 16px;
+  border-radius: 28px;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.9), rgba(247, 244, 255, 0.9));
+  box-shadow: var(--shadow);
+}
+
+.profile-avatar {
+  display: grid;
+  width: 72px;
+  height: 72px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 50%;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--pink), var(--violet));
+  cursor: pointer;
+}
+
+.profile-avatar input {
+  display: none;
+}
+
+.profile-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.stats-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.stat-card {
+  min-height: 96px;
+}
+
+.bar-list {
+  display: grid;
+  gap: 12px;
+}
+
+.bar-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 7px 10px;
+  align-items: center;
+}
+
+.bar-row span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-row div {
+  grid-column: 1 / -1;
+  height: 9px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.bar-row i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--aqua), var(--violet));
+}
+
+.wide-chart {
+  display: flex;
+  align-items: end;
+  gap: 8px;
+  min-height: 130px;
+}
+
+.wide-chart span {
+  flex: 1;
+  min-width: 8px;
+  border-radius: 999px 999px 4px 4px;
+  background: linear-gradient(180deg, var(--pink), var(--violet));
 }
 
 .calendar-header {
@@ -530,7 +655,7 @@ label {
 
 .segmented {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 4px;
   padding: 5px;
   border: 1px solid var(--line);
@@ -552,6 +677,57 @@ label {
   background: linear-gradient(135deg, var(--violet), var(--violet-deep));
 }
 
+.helper-text {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.star-rating {
+  display: grid;
+  grid-template-columns: 34px repeat(10, 1fr);
+  gap: 3px;
+  min-height: 42px;
+}
+
+.star-rating button {
+  min-width: 0;
+  border: 0;
+  border-radius: 10px;
+  color: rgba(111, 66, 200, 0.3);
+  background: var(--surface-soft);
+  font-size: 1rem;
+  font-weight: 900;
+}
+
+.star-rating button.active {
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--gold), var(--pink));
+}
+
+.star-rating button.half-step {
+  font-size: 0.8rem;
+}
+
+.photo-field {
+  align-items: start;
+}
+
+.photo-preview {
+  display: grid;
+  width: 88px;
+  height: 88px;
+  place-items: center;
+  overflow: hidden;
+  border-radius: 30px;
+  color: #ffffff;
+  background: linear-gradient(135deg, var(--aqua), var(--violet));
+}
+
+.photo-preview img {
+  width: 100%;
+  height: 100%;
+}
+
 menu {
   justify-content: space-between;
   padding: 0;
@@ -560,12 +736,6 @@ menu {
 
 .hidden {
   display: none !important;
-}
-
-.privacy .private-text {
-  color: transparent;
-  text-shadow: 0 0 11px rgba(36, 37, 58, 0.48);
-  user-select: none;
 }
 
 [data-icon] {
