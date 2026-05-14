@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#8372f2" />
     <title>s3x</title>
-    <link rel="manifest" href="manifest.webmanifest" />
-    <link rel="icon" href="icon.svg" />
+    <link rel="manifest" href="manifest.json" />
+    <link rel="icon" type="image/png" sizes="512x512" href="icon.png" />
+    <link rel="apple-touch-icon" href="icon.png" />
     <link rel="stylesheet" href="styles.css" />
   </head>
   <body>
@@ -45,7 +46,7 @@
             </article>
             <article class="metric-card">
               <span data-icon="heart"></span>
-              <p>Media mood</p>
+              <p>Voto medio</p>
               <strong id="moodAverage">-</strong>
             </article>
             <article class="metric-card">
@@ -150,7 +151,7 @@
           </section>
           <section class="content-block">
             <div class="section-heading">
-              <h2>Trend mood</h2>
+              <h2>Trend voto</h2>
             </div>
             <div class="wide-chart" id="moodChart"></div>
           </section>
@@ -238,9 +239,9 @@
             <span class="helper-text" id="newPartnerHint"></span>
           </label>
           <label>
-            Mood
+            Voto
             <input id="encounterMood" type="hidden" value="4" />
-            <div class="star-rating" id="starRating" role="group" aria-label="Mood"></div>
+            <div class="star-rating" id="starRating" role="group" aria-label="Voto"></div>
             <span class="helper-text" id="moodValue">4 / 5</span>
           </label>
           <div class="segmented" id="protectedGroup" role="group" aria-label="Protezione">
