@@ -32,7 +32,7 @@ const demoData = {
       photo: "",
       tags: ["dolce", "ongoing"],
       notes: "Ama messaggi chiari e aftercare tranquillo.",
-      revisit: true,
+      revisit: "yes",
       metVia: "Instagram",
     },
     {
@@ -43,7 +43,7 @@ const demoData = {
       photo: "",
       tags: ["casual"],
       notes: "Preferisce organizzare con anticipo.",
-      revisit: false,
+      revisit: "no",
       metVia: "Tinder",
     },
   ],
@@ -87,7 +87,7 @@ let state = loadState();
 let activeTab = "dashboard";
 let selectedSafe = "yes";
 let selectedFirstTime = false;
-let selectedRevisit = false;
+let selectedRevisit = "maybe";
 let selectedDate = toInputDate(new Date());
 let calendarCursor = new Date();
 let partnerPhotoData = "";
@@ -163,7 +163,7 @@ function wireEvents() {
 
   $$("#revisitGroup button").forEach((button) => {
     button.addEventListener("click", () => {
-      selectedRevisit = button.dataset.revisit === "yes";
+      selectedRevisit = button.dataset.revisit;
       $$("#revisitGroup button").forEach((item) => item.classList.toggle("active", item === button));
     });
   });
@@ -245,9 +245,15 @@ function normalizePartners(partners) {
     photo: partner.photo || "",
     tags: partner.tags || [],
     notes: partner.notes || "",
-    revisit: Boolean(partner.revisit),
+    revisit: normalizeRevisit(partner.revisit),
     metVia: String(partner.metVia || ""),
   }));
+}
+
+function normalizeRevisit(value) {
+  if (value === "yes" || value === "no" || value === "maybe") return value;
+  if (value === true) return "yes";
+  return "maybe";
 }
 
 function render() {
@@ -628,9 +634,8 @@ function renderPartners() {
               ${avatarHtml(partner)}
               <div class="partner-name-block">
                 <strong class="private-text">${escapeHtml(partner.alias || partner.name)}</strong>
-                ${partner.alias && partner.name ? `<p class="meta private-text">${escapeHtml(partner.name)}</p>` : ""}
                 ${avg !== null ? `<div class="partner-stars">${renderStarsReadonly(avg)}</div>` : ""}
-                ${partner.revisit ? `<span class="revisit-badge">Da rivedere</span>` : ""}
+                ${revisitBadge(partner)}
               </div>
             </div>
             <p class="meta">${count} incontri${last ? `, ultimo ${shortDate(last.date)}` : ""}</p>
@@ -731,9 +736,10 @@ function eventCard(item) {
   const partner = getPartner(item.partnerId);
   const isFirst = isFirstEncounter(item);
   const metVia = partner?.metVia;
+  const firstYear = item.date ? item.date.slice(0, 4) : "";
   const statusRow = [
     isFirst
-      ? '<button type="button" class="pill pill-tag first-time" data-tag="first" data-tag-kind="encounter" data-filter-type="first">Prima volta</button>'
+      ? `<button type="button" class="pill pill-tag first-time" data-tag="first" data-tag-kind="encounter" data-filter-type="first">Prima volta${firstYear ? ` · ${firstYear}` : ""}</button>`
       : "",
     formatSafetyPill(item),
     metVia ? `<span class="pill pill-soft">Conosciuta su ${escapeHtml(metVia)}</span>` : "",
@@ -832,7 +838,18 @@ function avatarHtml(partner) {
 }
 
 function partnerLabel(partner) {
-  return partner.alias ? `${partner.name} (${partner.alias})` : partner.name;
+  if (partner.alias && partner.name) return `${partner.name} (${partner.alias})`;
+  return partner.alias || partner.name || "Senza nome";
+}
+
+function revisitBadge(partner) {
+  if (partner.revisit === "yes") {
+    return `<span class="revisit-badge revisit-yes">★ Da rivedere</span>`;
+  }
+  if (partner.revisit === "no") {
+    return `<span class="revisit-badge revisit-no">✕ Da NON rivedere</span>`;
+  }
+  return "";
 }
 
 function findPartnerByName(value) {
@@ -1028,9 +1045,9 @@ function openPartnerDialog(id = "") {
   $("#partnerNotes").value = partner?.notes || "";
   $("#partnerPhoto").value = "";
 
-  selectedRevisit = Boolean(partner?.revisit);
+  selectedRevisit = normalizeRevisit(partner?.revisit);
   $$("#revisitGroup button").forEach((button) => {
-    button.classList.toggle("active", (button.dataset.revisit === "yes") === selectedRevisit);
+    button.classList.toggle("active", button.dataset.revisit === selectedRevisit);
   });
 
   const avg = id ? partnerAvgMood(id) : null;
@@ -1070,11 +1087,15 @@ function saveEntry(event) {
 
   if (type === "partner") {
     const name = $("#partnerName").value.trim();
-    if (!name) return;
+    const alias = $("#partnerAlias").value.trim();
+    if (!name && !alias) {
+      $("#partnerAlias").focus();
+      return;
+    }
     const payload = {
       id: id || crypto.randomUUID(),
       name,
-      alias: $("#partnerAlias").value.trim(),
+      alias,
       firstDate: $("#partnerFirstDate").value,
       photo: partnerPhotoData,
       tags: splitTags($("#partnerTags").value),
@@ -1096,7 +1117,7 @@ function saveEntry(event) {
         photo: "",
         tags: [],
         notes: "",
-        revisit: false,
+        revisit: "maybe",
         metVia: "",
       };
       state.partners = [partner, ...state.partners];
