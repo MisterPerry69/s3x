@@ -33,6 +33,7 @@ const demoData = {
       tags: ["dolce", "ongoing"],
       notes: "Ama messaggi chiari e aftercare tranquillo.",
       revisit: true,
+      metVia: "Instagram",
     },
     {
       id: crypto.randomUUID(),
@@ -43,6 +44,7 @@ const demoData = {
       tags: ["casual"],
       notes: "Preferisce organizzare con anticipo.",
       revisit: false,
+      metVia: "Tinder",
     },
   ],
   encounters: [],
@@ -234,6 +236,7 @@ function normalizePartners(partners) {
     tags: partner.tags || [],
     notes: partner.notes || "",
     revisit: Boolean(partner.revisit),
+    metVia: String(partner.metVia || ""),
   }));
 }
 
@@ -580,6 +583,7 @@ function renderPartners() {
             </div>
             <p class="meta">${count} incontri${last ? `, ultimo ${shortDate(last.date)}` : ""}</p>
             ${partner.firstDate ? `<p class="meta">Prima volta: ${shortDate(partner.firstDate)}</p>` : ""}
+            ${partner.metVia ? `<p class="meta">Conosciuta su: ${escapeHtml(partner.metVia)}</p>` : ""}
             <div class="tag-row">${tagsHtml(partner.tags)}</div>
             ${partner.notes ? `<p class="private-text">${escapeHtml(partner.notes)}</p>` : ""}
           </article>
@@ -640,6 +644,14 @@ function renderPartnerOptions() {
     .join("");
   $("#filterPartner").innerHTML = '<option value="">Tutti</option>' + selectOptions;
   $("#partnerSuggestions").innerHTML = suggestions;
+
+  const defaults = ["Tinder", "Instagram", "Hinge", "Bumble", "Dal vivo", "Tramite amici"];
+  const used = state.partners.map((partner) => partner.metVia).filter(Boolean);
+  const metViaOptions = [...new Set([...used, ...defaults])]
+    .map((value) => `<option value="${escapeHtml(value)}"></option>`)
+    .join("");
+  const metViaList = $("#metViaSuggestions");
+  if (metViaList) metViaList.innerHTML = metViaOptions;
 }
 
 function formatSafetyPill(item) {
@@ -888,6 +900,7 @@ function openPartnerDialog(id = "") {
   $("#partnerName").value = partner?.name || "";
   $("#partnerAlias").value = partner?.alias || "";
   $("#partnerFirstDate").value = partner?.firstDate || "";
+  $("#partnerMetVia").value = partner?.metVia || "";
   $("#partnerTags").value = (partner?.tags || []).join(", ");
   $("#partnerNotes").value = partner?.notes || "";
   $("#partnerPhoto").value = "";
@@ -944,6 +957,7 @@ function saveEntry(event) {
       tags: splitTags($("#partnerTags").value),
       notes: $("#partnerNotes").value.trim(),
       revisit: selectedRevisit,
+      metVia: $("#partnerMetVia").value.trim(),
     };
     state.partners = id ? state.partners.map((item) => (item.id === id ? payload : item)) : [payload, ...state.partners];
   } else {
@@ -960,6 +974,7 @@ function saveEntry(event) {
         tags: [],
         notes: "",
         revisit: false,
+        metVia: "",
       };
       state.partners = [partner, ...state.partners];
     }
