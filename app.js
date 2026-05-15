@@ -156,8 +156,8 @@ function wireEvents() {
     });
   });
 
-  $("#wizardPrev").addEventListener("click", prevStep);
-  $("#wizardNext").addEventListener("click", nextStep);
+  $("#wizardPrev")?.addEventListener("click", prevStep);
+  $("#wizardNext")?.addEventListener("click", nextStep);
 
   buildStarRating();
 }
@@ -173,9 +173,9 @@ function goToStep(step) {
     dot.classList.toggle("current", n === wizardStep);
   });
   const isLast = wizardStep === WIZARD_STEPS;
-  $("#wizardPrev").classList.toggle("hidden", wizardStep === 1);
-  $("#wizardNext").classList.toggle("hidden", isLast);
-  $("#saveEntryButton").classList.toggle("hidden", !isLast);
+  $("#wizardPrev")?.classList.toggle("hidden", wizardStep === 1);
+  $("#wizardNext")?.classList.toggle("hidden", isLast);
+  $("#saveEntryButton")?.classList.toggle("hidden", !isLast);
 }
 
 function nextStep() {
@@ -757,9 +757,7 @@ function buildStarRating() {
   container.innerHTML = Array.from({ length: 5 }, (_, index) => {
     const value = index + 1;
     return `<button class="star-button" type="button" data-star="${value}" aria-label="Voto ${value}">
-      <span class="star-icon star-empty-icon">☆</span>
-      <span class="star-icon star-full-icon">★</span>
-      <span class="star-icon star-half-icon">⭐</span>
+      <span class="star-icon">★</span>
     </button>`;
   }).join("");
 
@@ -788,11 +786,7 @@ function updateStarRating() {
     const value = Number(button.dataset.star);
     const isFull = value <= mood;
     const isHalf = value - 0.5 === mood;
-    const isEmpty = !isFull && !isHalf;
     button.dataset.state = isFull ? "full" : isHalf ? "half" : "empty";
-    button.classList.toggle("star-active", isFull);
-    button.classList.toggle("star-half-active", isHalf);
-    button.classList.toggle("star-inactive", isEmpty);
   });
   const label = mood === 0 ? "Nessun voto" : `${mood.toFixed(mood % 1 ? 1 : 0)} / 5`;
   $("#moodValue").textContent = label;
@@ -1122,5 +1116,5 @@ function escapeHtml(value = "") {
 boot();
 
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("sw.js").catch(() => {});
+  navigator.serviceWorker.register("./sw.js").catch(() => {});
 }

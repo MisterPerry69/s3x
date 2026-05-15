@@ -43,10 +43,25 @@
   box-sizing: border-box;
 }
 
+html {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+html::-webkit-scrollbar,
+body::-webkit-scrollbar,
+dialog::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
+}
+
 body {
   min-height: 100vh;
   margin: 0;
   color: var(--plum);
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   background:
     radial-gradient(circle at 84% 6%, rgba(255, 157, 122, 0.28), transparent 22rem),
     radial-gradient(circle at 10% 24%, rgba(255, 122, 138, 0.16), transparent 20rem),
@@ -91,6 +106,10 @@ menu,
 .topbar {
   justify-content: space-between;
   margin-bottom: 24px;
+}
+
+body:not([data-tab="dashboard"]) .topbar {
+  display: none;
 }
 
 .eyebrow {
@@ -634,56 +653,36 @@ img.avatar,
 /* ─── STAR RATING INTERATTIVO ─── */
 
 .star-rating {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 9px;
+  display: flex;
+  gap: 6px;
+  padding: 2px 0;
 }
 
 .star-button {
   position: relative;
   display: grid;
   place-items: center;
-  height: 56px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
   border: 0;
-  border-radius: var(--radius-sm);
-  background: var(--card-soft);
-  font-size: 1.85rem;
+  background: none;
+  font-size: 2rem;
   line-height: 1;
-  transition: transform 0.16s cubic-bezier(0.34, 1.45, 0.64, 1), background 0.16s, box-shadow 0.16s;
-  overflow: hidden;
+  color: var(--plum-faint);
+  transition: transform 0.12s ease, color 0.12s ease;
 }
 
 .star-button .star-icon {
-  position: absolute;
-  transition: opacity 0.16s, transform 0.16s;
   pointer-events: none;
 }
 
-.star-button .star-empty-icon { opacity: 1; transform: scale(1); color: var(--plum-faint); }
-.star-button .star-full-icon  { opacity: 0; transform: scale(0.6); color: var(--peach-deep); }
-.star-button .star-half-icon  { opacity: 0; transform: scale(0.6); }
-
+/* single ★ glyph, recolored by state — half uses a clipped gradient on the glyph */
 .star-button[data-state="full"] {
-  background: var(--peach-soft);
-  box-shadow: 0 8px 18px rgba(244, 130, 92, 0.22);
-  transform: scale(1.05);
+  color: var(--peach-deep);
 }
 
-.star-button[data-state="full"] .star-empty-icon { opacity: 0; transform: scale(0.6); }
-.star-button[data-state="full"] .star-full-icon  { opacity: 1; transform: scale(1); }
-.star-button[data-state="full"] .star-half-icon  { opacity: 0; transform: scale(0.6); }
-
-.star-button[data-state="half"] {
-  background: var(--peach-soft);
-  box-shadow: 0 6px 14px rgba(244, 130, 92, 0.16);
-  transform: scale(1.03);
-}
-
-.star-button[data-state="half"] .star-empty-icon { opacity: 0; transform: scale(0.6); }
-.star-button[data-state="half"] .star-full-icon  { opacity: 0; transform: scale(0.6); }
-.star-button[data-state="half"] .star-half-icon  {
-  opacity: 1;
-  transform: scale(1);
+.star-button[data-state="half"] .star-icon {
   background: linear-gradient(90deg, var(--peach-deep) 50%, var(--plum-faint) 50%);
   -webkit-background-clip: text;
   background-clip: text;
@@ -691,13 +690,11 @@ img.avatar,
 }
 
 .star-button:hover {
-  transform: scale(1.08) translateY(-2px);
-  box-shadow: 0 8px 18px rgba(244, 130, 92, 0.22);
+  transform: scale(1.12);
 }
 
 .star-button:active {
-  transform: scale(0.92);
-  transition-duration: 0.07s;
+  transform: scale(0.9);
 }
 
 .mood-value {

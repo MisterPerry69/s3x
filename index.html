@@ -224,6 +224,7 @@
         </div>
         <input type="hidden" id="entryId" />
         <input type="hidden" id="entryType" />
+
         <div id="partnerFields" class="form-stack hidden">
           <label class="photo-field">
             Foto
@@ -231,18 +232,25 @@
             <input id="partnerPhoto" type="file" accept="image/*" />
           </label>
           <label>
-            Nome
-            <input id="partnerName" type="text" autocomplete="off" />
+            Alias
+            <input id="partnerAlias" type="text" placeholder="Come lo chiami tu" autocomplete="off" />
           </label>
           <label>
-            Alias
-            <input id="partnerAlias" type="text" autocomplete="off" />
+            Nome
+            <input id="partnerName" type="text" autocomplete="off" />
           </label>
           <label>
             Prima volta
             <input id="partnerFirstDate" type="date" />
           </label>
           <p class="helper-text partner-avg-mood hidden" id="partnerAvgMood"></p>
+          <label>
+            Da rivedere
+            <div class="segmented" id="revisitGroup" role="group" aria-label="Da rivedere">
+              <button type="button" data-revisit="yes">Sì</button>
+              <button type="button" data-revisit="no" class="active">No</button>
+            </div>
+          </label>
           <label>
             Vibe / tag
             <input id="partnerTags" type="text" placeholder="dolce, casual, ex..." autocomplete="off" />
@@ -252,36 +260,63 @@
             <textarea id="partnerNotes" rows="3"></textarea>
           </label>
         </div>
+
         <div id="encounterFields" class="form-stack">
-          <label>
-            Data
-            <input id="encounterDate" type="date" />
-          </label>
-          <label>
-            Partner
-            <input id="encounterPartnerName" list="partnerSuggestions" type="text" placeholder="Nome o alias" autocomplete="off" />
-            <datalist id="partnerSuggestions"></datalist>
-            <span class="helper-text" id="newPartnerHint"></span>
-          </label>
-          <label>
-            Voto
-            <input id="encounterMood" type="hidden" value="4" />
-            <div class="star-rating" id="starRating" role="group" aria-label="Voto"></div>
-            <span class="helper-text" id="moodValue">4 / 5</span>
-          </label>
-          <div class="segmented" id="protectedGroup" role="group" aria-label="Protezione">
-            <button type="button" data-safe="yes" class="active">Protetto</button>
-            <button type="button" data-safe="no">Non protetto</button>
+          <div class="wizard-steps" aria-hidden="true">
+            <i data-step-dot="1"></i>
+            <i data-step-dot="2"></i>
+            <i data-step-dot="3"></i>
           </div>
-          <label>
-            Tag
-            <input id="encounterTags" type="text" placeholder="romantico, aftercare, quick..." autocomplete="off" />
-          </label>
-          <label>
-            Note
-            <textarea id="encounterNotes" rows="4"></textarea>
-          </label>
+
+          <div class="wizard-step" data-step="1">
+            <p class="wizard-step-title">Chi e quando</p>
+            <label>
+              Data
+              <input id="encounterDate" type="date" />
+            </label>
+            <label>
+              Partner
+              <input id="encounterPartnerName" list="partnerSuggestions" type="text" placeholder="Nome o alias" autocomplete="off" />
+              <datalist id="partnerSuggestions"></datalist>
+              <span class="helper-text" id="newPartnerHint"></span>
+            </label>
+          </div>
+
+          <div class="wizard-step" data-step="2">
+            <p class="wizard-step-title">Com'è andata</p>
+            <label>
+              Voto
+              <input id="encounterMood" type="hidden" value="4" />
+              <div class="star-rating" id="starRating" role="group" aria-label="Voto"></div>
+              <span class="mood-value" id="moodValue">4 / 5</span>
+            </label>
+            <label>
+              Protezione
+              <div class="segmented" id="protectedGroup" role="group" aria-label="Protezione">
+                <button type="button" data-safe="yes" class="active">Protetto</button>
+                <button type="button" data-safe="no">Non protetto</button>
+              </div>
+            </label>
+          </div>
+
+          <div class="wizard-step" data-step="3">
+            <p class="wizard-step-title">Dettagli</p>
+            <label>
+              Tag
+              <input id="encounterTags" type="text" placeholder="romantico, aftercare, quick..." autocomplete="off" />
+            </label>
+            <label>
+              Note
+              <textarea id="encounterNotes" rows="4"></textarea>
+            </label>
+          </div>
+
+          <div class="wizard-nav">
+            <button class="ghost-button" id="wizardPrev" type="button">Indietro</button>
+            <button class="primary-button" id="wizardNext" type="button">Avanti</button>
+          </div>
         </div>
+
         <menu>
           <button class="danger-button hidden" id="deleteEntryButton" type="button">Elimina</button>
           <button class="primary-button" id="saveEntryButton" value="default" type="submit">Salva</button>
