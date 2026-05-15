@@ -449,7 +449,6 @@ p {
   box-shadow: var(--shadow);
 }
 
-.event-top,
 .tag-row {
   display: flex;
   flex-wrap: wrap;
@@ -458,13 +457,50 @@ p {
 }
 
 .event-top {
-  justify-content: space-between;
-  padding-right: 42px;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
 }
 
-.event-top strong {
+.event-date {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.event-name {
   font-size: 1.05rem;
   font-weight: 700;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.event-mood {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.status-row {
+  align-items: center;
+}
+
+.status-row .pill {
+  font-weight: 600;
+}
+
+.event-notes {
+  margin-top: 2px;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--plum-soft);
+}
+
+.pill-soft {
+  background: var(--card-soft);
+  color: var(--plum-soft);
 }
 
 .partner-row {
@@ -564,6 +600,29 @@ img.avatar,
   fill: none;
   stroke-linecap: round;
   stroke-linejoin: round;
+}
+
+/* event card: pencil bottom-right, out of the data·name·vote row */
+.event-card {
+  padding-bottom: 52px;
+}
+
+.event-card .edit-chip {
+  top: auto;
+  bottom: 14px;
+  right: 14px;
+  width: 32px;
+  height: 32px;
+  opacity: 0.7;
+}
+
+.event-card .edit-chip:hover {
+  opacity: 1;
+}
+
+.event-card .edit-chip svg {
+  width: 14px;
+  height: 14px;
 }
 
 /* ─── PILLS ─── */

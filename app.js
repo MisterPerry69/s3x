@@ -86,11 +86,13 @@ demoData.encounters = [
 let state = loadState();
 let activeTab = "dashboard";
 let selectedSafe = "yes";
+let selectedFirstTime = false;
 let selectedRevisit = false;
 let selectedDate = toInputDate(new Date());
 let calendarCursor = new Date();
 let partnerPhotoData = "";
 let partnerTagFilter = "";
+let logFilter = null; // { type: "tag" | "safe" | "first", value }
 let wizardStep = 1;
 const WIZARD_STEPS = 3;
 
@@ -149,6 +151,13 @@ function wireEvents() {
     button.addEventListener("click", () => {
       selectedSafe = button.dataset.safe;
       $$("#protectedGroup button").forEach((item) => item.classList.toggle("active", item === button));
+    });
+  });
+
+  $$("#firstTimeGroup button").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedFirstTime = button.dataset.first === "yes";
+      $$("#firstTimeGroup button").forEach((item) => item.classList.toggle("active", item === button));
     });
   });
 
@@ -548,16 +557,47 @@ function renderMoodChart(items) {
   }
 }
 
+function logFilterLabel(filter) {
+  if (filter.type === "tag") return `Tag: ${filter.value}`;
+  if (filter.type === "safe") return filter.value === "yes" ? "Protetto" : "Non protetto";
+  if (filter.type === "first") return "Prima volta";
+  return filter.value;
+}
+
+function matchesLogFilter(item) {
+  if (!logFilter) return true;
+  if (logFilter.type === "tag") return (item.tags || []).includes(logFilter.value);
+  if (logFilter.type === "safe") return item.safe === logFilter.value;
+  if (logFilter.type === "first") return item.firstTime === true;
+  return true;
+}
+
 function renderLists() {
   const query = $("#searchInput").value?.trim().toLowerCase() || "";
   const partnerFilter = $("#filterPartner").value;
   const items = sortedEncounters().filter((item) => {
     const partner = getPartner(item.partnerId);
     const haystack = [partner?.name, partner?.alias, item.notes, ...(item.tags || [])].join(" ").toLowerCase();
-    return (!partnerFilter || item.partnerId === partnerFilter) && (!query || haystack.includes(query));
+    return (
+      (!partnerFilter || item.partnerId === partnerFilter) &&
+      (!query || haystack.includes(query)) &&
+      matchesLogFilter(item)
+    );
   });
 
-  $("#encounterList").innerHTML = items.map(eventCard).join("") || emptyState("Nessun risultato.");
+  const filterChip = logFilter
+    ? `<div class="active-filter">
+         <span>${escapeHtml(logFilterLabel(logFilter))}</span>
+         <button type="button" id="clearLogFilter" aria-label="Rimuovi filtro">✕</button>
+       </div>`
+    : "";
+
+  $("#encounterList").innerHTML =
+    filterChip + (items.map(eventCard).join("") || emptyState("Nessun risultato."));
+  $("#clearLogFilter")?.addEventListener("click", () => {
+    logFilter = null;
+    renderLists();
+  });
   bindEventCards($("#encounterList"));
 }
 
@@ -677,12 +717,7 @@ function renderPartnerOptions() {
 function formatSafetyPill(item) {
   const safeText = item.safe === "yes" ? "Protetto" : "Non protetto";
   const safeClass = item.safe === "yes" ? "safe" : item.safe === "no" ? "risk" : "";
-  return `<span class="pill ${safeClass}">${safeText}</span>`;
-}
-
-function formatMoodPill(item) {
-  const mood = Number(item.mood || 0);
-  return `<span class="pill pill-mood">${renderStarsInline(mood)}</span>`;
+  return `<button type="button" class="pill pill-tag ${safeClass}" data-tag="${item.safe}" data-tag-kind="encounter" data-filter-type="safe">${safeText}</button>`;
 }
 
 function bindEventCards(root = document) {
@@ -695,22 +730,30 @@ function bindEventCards(root = document) {
 function eventCard(item) {
   const partner = getPartner(item.partnerId);
   const isFirst = isFirstEncounter(item);
+  const metVia = partner?.metVia;
+  const statusRow = [
+    isFirst
+      ? '<button type="button" class="pill pill-tag first-time" data-tag="first" data-tag-kind="encounter" data-filter-type="first">Prima volta</button>'
+      : "",
+    formatSafetyPill(item),
+    metVia ? `<span class="pill pill-soft">Conosciuta su ${escapeHtml(metVia)}</span>` : "",
+  ]
+    .filter(Boolean)
+    .join("");
+  const tags = tagsHtml(item.tags, "encounter");
   return `
     <article class="event-card">
       <button class="edit-chip" data-edit-encounter="${item.id}" type="button" aria-label="Modifica incontro">
         ${icons.pencil}
       </button>
       <div class="event-top">
-        <strong class="private-text">${escapeHtml(partner ? partnerLabel(partner) : "Senza nome")}</strong>
-        <span class="meta">${shortDate(item.date)}</span>
+        <span class="event-date meta">${shortDate(item.date)}</span>
+        <strong class="event-name private-text">${escapeHtml(partner ? partnerLabel(partner) : "Senza nome")}</strong>
+        <span class="event-mood">${renderStarsInline(Number(item.mood || 0))}</span>
       </div>
-      <div class="tag-row">
-        ${isFirst ? '<span class="pill first-time">Prima volta</span>' : ""}
-        ${formatSafetyPill(item)}
-        ${formatMoodPill(item)}
-        ${tagsHtml(item.tags, "encounter")}
-      </div>
-      ${item.notes ? `<p class="private-text">${escapeHtml(item.notes)}</p>` : ""}
+      ${statusRow ? `<div class="tag-row status-row">${statusRow}</div>` : ""}
+      ${tags ? `<div class="tag-row">${tags}</div>` : ""}
+      ${item.notes ? `<p class="private-text event-notes">${escapeHtml(item.notes)}</p>` : ""}
     </article>
   `;
 }
@@ -751,7 +794,7 @@ function tagsHtml(tags = [], kind = "") {
     .map((tag) => {
       const safe = escapeHtml(tag);
       if (kind === "encounter" || kind === "partner") {
-        return `<button type="button" class="pill pill-tag" data-tag="${safe}" data-tag-kind="${kind}">${safe}</button>`;
+        return `<button type="button" class="pill pill-tag" data-tag="${safe}" data-tag-kind="${kind}" data-filter-type="tag">${safe}</button>`;
       }
       return `<span class="pill">${safe}</span>`;
     })
@@ -762,13 +805,14 @@ function bindTagFilters(root) {
   $$("[data-tag]", root).forEach((button) => {
     button.addEventListener("click", (event) => {
       event.stopPropagation();
-      const tag = button.dataset.tag;
-      if (button.dataset.tagKind === "partner") {
-        partnerTagFilter = tag;
+      const value = button.dataset.tag;
+      const kind = button.dataset.tagKind;
+      const filterType = button.dataset.filterType || "tag";
+      if (kind === "partner") {
+        partnerTagFilter = value;
         setTab("partners");
       } else {
-        $("#searchInput").value = tag;
-        updateClearSearch();
+        logFilter = { type: filterType, value };
         renderLists();
         setTab("log");
       }
@@ -800,9 +844,7 @@ function findPartnerByName(value) {
 }
 
 function isFirstEncounter(item) {
-  const partnerItems = sortedEncounters().filter((encounter) => encounter.partnerId === item.partnerId);
-  // sortedEncounters() is desc, so the oldest is last
-  return partnerItems.length > 0 && partnerItems[partnerItems.length - 1].id === item.id;
+  return item.firstTime === true;
 }
 
 function partnerAvgMood(partnerId) {
@@ -938,6 +980,7 @@ function setTab(tab) {
   $$(".view").forEach((view) => view.classList.toggle("active", view.id === `view-${tab}`));
   if (tab === "calendar") renderCalendar();
   if (tab === "profile") renderStats();
+  if (tab === "partners") renderPartners();
   document.body.dataset.tab = tab;
 }
 
@@ -957,6 +1000,10 @@ function openEncounterDialog(id = "", date = "") {
   selectedSafe = item?.safe === "no" ? "no" : "yes";
   $$("#protectedGroup button").forEach((button) => {
     button.classList.toggle("active", button.dataset.safe === selectedSafe);
+  });
+  selectedFirstTime = item?.firstTime === true;
+  $$("#firstTimeGroup button").forEach((button) => {
+    button.classList.toggle("active", (button.dataset.first === "yes") === selectedFirstTime);
   });
   updateStarRating();
   updateNewPartnerHint();
@@ -1061,6 +1108,7 @@ function saveEntry(event) {
       partnerId: partner.id,
       mood: Number($("#encounterMood").value),
       safe: selectedSafe,
+      firstTime: selectedFirstTime,
       tags: splitTags($("#encounterTags").value),
       notes: $("#encounterNotes").value.trim(),
     };
