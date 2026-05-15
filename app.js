@@ -90,11 +90,12 @@ let selectedRevisit = false;
 let selectedDate = toInputDate(new Date());
 let calendarCursor = new Date();
 let partnerPhotoData = "";
+let partnerTagFilter = "";
 let wizardStep = 1;
 const WIZARD_STEPS = 3;
 
 const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => [...document.querySelectorAll(selector)];
+const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
 
 function boot() {
   $$("[data-icon]").forEach((node) => {
@@ -287,7 +288,7 @@ function renderDashboard() {
 
   $("#recentList").innerHTML =
     sorted.slice(0, RECENT_ITEMS_LIMIT).map(eventCard).join("") || emptyState("Nessun incontro registrato.");
-  bindEventCards();
+  bindEventCards($("#recentList"));
   renderInsights();
 }
 
@@ -557,12 +558,23 @@ function renderLists() {
   });
 
   $("#encounterList").innerHTML = items.map(eventCard).join("") || emptyState("Nessun risultato.");
-  bindEventCards();
+  bindEventCards($("#encounterList"));
 }
 
 function renderPartners() {
-  $("#partnerList").innerHTML =
-    state.partners
+  const filtered = partnerTagFilter
+    ? state.partners.filter((partner) => (partner.tags || []).includes(partnerTagFilter))
+    : state.partners;
+
+  const filterChip = partnerTagFilter
+    ? `<div class="active-filter">
+         <span>Tag: <strong>${escapeHtml(partnerTagFilter)}</strong></span>
+         <button type="button" id="clearPartnerTagFilter" aria-label="Rimuovi filtro">✕</button>
+       </div>`
+    : "";
+
+  const cards =
+    filtered
       .map((partner) => {
         const count = state.encounters.filter((item) => item.partnerId === partner.id).length;
         const last = sortedEncounters().find((item) => item.partnerId === partner.id);
@@ -584,16 +596,24 @@ function renderPartners() {
             <p class="meta">${count} incontri${last ? `, ultimo ${shortDate(last.date)}` : ""}</p>
             ${partner.firstDate ? `<p class="meta">Prima volta: ${shortDate(partner.firstDate)}</p>` : ""}
             ${partner.metVia ? `<p class="meta">Conosciuta su: ${escapeHtml(partner.metVia)}</p>` : ""}
-            <div class="tag-row">${tagsHtml(partner.tags)}</div>
+            <div class="tag-row">${tagsHtml(partner.tags, "partner")}</div>
             ${partner.notes ? `<p class="private-text">${escapeHtml(partner.notes)}</p>` : ""}
           </article>
         `;
       })
-      .join("") || emptyState("Aggiungi il primo partner o alias.");
+      .join("") ||
+    emptyState(partnerTagFilter ? "Nessun partner con questo tag." : "Aggiungi il primo partner o alias.");
 
-  $$("[data-edit-partner]").forEach((button) => {
+  $("#partnerList").innerHTML = filterChip + cards;
+
+  $("#clearPartnerTagFilter")?.addEventListener("click", () => {
+    partnerTagFilter = "";
+    renderPartners();
+  });
+  $$("[data-edit-partner]", $("#partnerList")).forEach((button) => {
     button.addEventListener("click", () => openPartnerDialog(button.dataset.editPartner));
   });
+  bindTagFilters($("#partnerList"));
 }
 
 function renderCalendar() {
@@ -632,7 +652,7 @@ function renderCalendar() {
     month: "long",
   });
   $("#dayList").innerHTML = dayItems.map(eventCard).join("") || emptyState("Niente in questa data.");
-  bindEventCards();
+  bindEventCards($("#dayList"));
 }
 
 function renderPartnerOptions() {
@@ -665,10 +685,11 @@ function formatMoodPill(item) {
   return `<span class="pill pill-mood">${renderStarsInline(mood)}</span>`;
 }
 
-function bindEventCards() {
-  $$("[data-edit-encounter]").forEach((button) => {
+function bindEventCards(root = document) {
+  $$("[data-edit-encounter]", root).forEach((button) => {
     button.addEventListener("click", () => openEncounterDialog(button.dataset.editEncounter));
   });
+  bindTagFilters(root);
 }
 
 function eventCard(item) {
@@ -687,7 +708,7 @@ function eventCard(item) {
         ${isFirst ? '<span class="pill first-time">Prima volta</span>' : ""}
         ${formatSafetyPill(item)}
         ${formatMoodPill(item)}
-        ${tagsHtml(item.tags)}
+        ${tagsHtml(item.tags, "encounter")}
       </div>
       ${item.notes ? `<p class="private-text">${escapeHtml(item.notes)}</p>` : ""}
     </article>
@@ -725,8 +746,34 @@ function renderStarsReadonly(value) {
   return html;
 }
 
-function tagsHtml(tags = []) {
-  return tags.map((tag) => `<span class="pill">${escapeHtml(tag)}</span>`).join("");
+function tagsHtml(tags = [], kind = "") {
+  return tags
+    .map((tag) => {
+      const safe = escapeHtml(tag);
+      if (kind === "encounter" || kind === "partner") {
+        return `<button type="button" class="pill pill-tag" data-tag="${safe}" data-tag-kind="${kind}">${safe}</button>`;
+      }
+      return `<span class="pill">${safe}</span>`;
+    })
+    .join("");
+}
+
+function bindTagFilters(root) {
+  $$("[data-tag]", root).forEach((button) => {
+    button.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const tag = button.dataset.tag;
+      if (button.dataset.tagKind === "partner") {
+        partnerTagFilter = tag;
+        setTab("partners");
+      } else {
+        $("#searchInput").value = tag;
+        updateClearSearch();
+        renderLists();
+        setTab("log");
+      }
+    });
+  });
 }
 
 function emptyState(text) {
