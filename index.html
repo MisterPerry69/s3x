@@ -56,6 +56,14 @@
             </article>
           </div>
 
+          <div class="mini-insight hidden" id="miniInsight">
+            <span class="insight-emoji" id="miniInsightEmoji">✨</span>
+            <div>
+              <strong id="miniInsightTitle"></strong>
+              <span id="miniInsightDetail"></span>
+            </div>
+          </div>
+
           <section class="content-block">
             <div class="section-heading">
               <h2>Recenti</h2>
@@ -74,7 +82,10 @@
             </button>
           </div>
           <div class="filter-row">
-            <input id="searchInput" type="search" placeholder="Cerca partner, tag o note" />
+            <div class="search-wrap">
+              <input id="searchInput" type="search" placeholder="Cerca partner, tag o note" autocomplete="off" />
+              <button id="clearSearch" class="clear-search hidden" type="button" aria-label="Cancella ricerca">✕</button>
+            </div>
             <select id="filterPartner">
               <option value="">Tutti</option>
             </select>
@@ -145,15 +156,28 @@
           <div class="metric-grid" id="statsGrid"></div>
           <section class="content-block">
             <div class="section-heading">
+              <h2>Cosa dicono i dati</h2>
+            </div>
+            <div class="insight-grid" id="insightGrid"></div>
+          </section>
+          <section class="content-block">
+            <div class="section-heading">
               <h2>Partner più presenti</h2>
             </div>
             <div class="bar-list" id="topPartners"></div>
           </section>
           <section class="content-block">
             <div class="section-heading">
-              <h2>Trend voto</h2>
+              <h2>Andamento voto</h2>
             </div>
-            <div class="wide-chart" id="moodChart"></div>
+            <div class="mood-timeline">
+              <div class="mood-chart" id="moodChart"></div>
+              <div class="mood-axis" id="moodAxis"></div>
+              <div class="mood-legend">
+                <span><i class="dot-safe"></i>Protetto</span>
+                <span><i class="dot-unsafe"></i>Non protetto</span>
+              </div>
+            </div>
           </section>
           <div class="settings-panel">
             <button class="text-button" id="exportButton" type="button">Esporta dati</button>
@@ -218,6 +242,7 @@
             Prima volta
             <input id="partnerFirstDate" type="date" />
           </label>
+          <p class="helper-text partner-avg-mood hidden" id="partnerAvgMood"></p>
           <label>
             Vibe / tag
             <input id="partnerTags" type="text" placeholder="dolce, casual, ex..." autocomplete="off" />

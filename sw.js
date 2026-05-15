@@ -1,4 +1,4 @@
-const CACHE_NAME = "s3x-v7";
+const CACHE_NAME = "s3x-v8";
 const ASSETS = ["./", "./index.html", "./styles.css", "./app.js", "./manifest.json", "./icon-192.png", "./icon.png"];
 
 self.addEventListener("install", (event) => {

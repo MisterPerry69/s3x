@@ -1,4 +1,8 @@
 const STORAGE_KEY = "luma-data-v1";
+const SPARKLINE_DAYS = 7;
+const RECENT_ITEMS_LIMIT = 3;
+const TOP_PARTNERS_LIMIT = 5;
+const MOOD_CHART_LIMIT = 12;
 
 const icons = {
   calendar: '<svg viewBox="0 0 24 24"><path d="M8 2v4M16 2v4M3 10h18"/><rect x="3" y="4" width="18" height="18" rx="2"/></svg>',
@@ -15,6 +19,7 @@ const icons = {
   shield: '<svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>',
   users: '<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
 };
 
 const demoData = {
@@ -27,6 +32,7 @@ const demoData = {
       photo: "",
       tags: ["dolce", "ongoing"],
       notes: "Ama messaggi chiari e aftercare tranquillo.",
+      revisit: true,
     },
     {
       id: crypto.randomUUID(),
@@ -36,6 +42,7 @@ const demoData = {
       photo: "",
       tags: ["casual"],
       notes: "Preferisce organizzare con anticipo.",
+      revisit: false,
     },
   ],
   encounters: [],
@@ -77,9 +84,12 @@ demoData.encounters = [
 let state = loadState();
 let activeTab = "dashboard";
 let selectedSafe = "yes";
+let selectedRevisit = false;
 let selectedDate = toInputDate(new Date());
 let calendarCursor = new Date();
 let partnerPhotoData = "";
+let wizardStep = 1;
+const WIZARD_STEPS = 3;
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -89,6 +99,7 @@ function boot() {
     node.innerHTML = icons[node.dataset.icon] || "";
   });
 
+  document.body.dataset.tab = activeTab;
   wireEvents();
   render();
 }
@@ -109,8 +120,17 @@ function wireEvents() {
   $("#entryForm").addEventListener("submit", saveEntry);
   $("#deleteEntryButton").addEventListener("click", deleteCurrentEntry);
   $("#partnerPhoto").addEventListener("change", handlePartnerPhoto);
+  $("#profilePhoto").addEventListener("change", handleProfilePhoto);
   $("#encounterPartnerName").addEventListener("input", updateNewPartnerHint);
-  $("#searchInput").addEventListener("input", renderLists);
+  $("#searchInput").addEventListener("input", () => {
+    renderLists();
+    updateClearSearch();
+  });
+  $("#clearSearch").addEventListener("click", () => {
+    $("#searchInput").value = "";
+    renderLists();
+    updateClearSearch();
+  });
   $("#filterPartner").addEventListener("change", renderLists);
   $("#prevMonth").addEventListener("click", () => shiftMonth(-1));
   $("#nextMonth").addEventListener("click", () => shiftMonth(1));
@@ -118,7 +138,6 @@ function wireEvents() {
   $("#statsScope").addEventListener("change", renderStats);
   $("#statsMonth").addEventListener("change", renderStats);
   $("#statsYear").addEventListener("change", renderStats);
-  $("#profilePhoto").addEventListener("change", handleProfilePhoto);
   $("#exportButton").addEventListener("click", exportData);
   $("#importInput").addEventListener("change", importData);
   $("#wipeButton").addEventListener("click", wipeData);
@@ -130,7 +149,51 @@ function wireEvents() {
     });
   });
 
+  $$("#revisitGroup button").forEach((button) => {
+    button.addEventListener("click", () => {
+      selectedRevisit = button.dataset.revisit === "yes";
+      $$("#revisitGroup button").forEach((item) => item.classList.toggle("active", item === button));
+    });
+  });
+
+  $("#wizardPrev").addEventListener("click", prevStep);
+  $("#wizardNext").addEventListener("click", nextStep);
+
   buildStarRating();
+}
+
+function goToStep(step) {
+  wizardStep = Math.min(WIZARD_STEPS, Math.max(1, step));
+  $$("#encounterFields .wizard-step").forEach((node) => {
+    node.classList.toggle("active", Number(node.dataset.step) === wizardStep);
+  });
+  $$("#encounterFields [data-step-dot]").forEach((dot) => {
+    const n = Number(dot.dataset.stepDot);
+    dot.classList.toggle("done", n < wizardStep);
+    dot.classList.toggle("current", n === wizardStep);
+  });
+  const isLast = wizardStep === WIZARD_STEPS;
+  $("#wizardPrev").classList.toggle("hidden", wizardStep === 1);
+  $("#wizardNext").classList.toggle("hidden", isLast);
+  $("#saveEntryButton").classList.toggle("hidden", !isLast);
+}
+
+function nextStep() {
+  if (wizardStep === 1 && !$("#encounterPartnerName").value.trim()) {
+    $("#newPartnerHint").textContent = "Inserisci un partner per continuare";
+    $("#encounterPartnerName").focus();
+    return;
+  }
+  goToStep(wizardStep + 1);
+}
+
+function prevStep() {
+  goToStep(wizardStep - 1);
+}
+
+function updateClearSearch() {
+  const hasValue = $("#searchInput").value.trim().length > 0;
+  $("#clearSearch").classList.toggle("hidden", !hasValue);
 }
 
 function loadState() {
@@ -154,18 +217,23 @@ function loadState() {
 }
 
 function saveState(nextState = state) {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
+  } catch {
+    alert("Spazio di archiviazione esaurito. Esporta i dati e libera spazio.");
+  }
 }
 
 function normalizePartners(partners) {
   return partners.map((partner) => ({
     id: partner.id || crypto.randomUUID(),
-    name: partner.name || partner.alias || "Senza nome",
-    alias: partner.alias || "",
+    name: String(partner.name || partner.alias || "Senza nome"),
+    alias: String(partner.alias || ""),
     firstDate: partner.firstDate || "",
     photo: partner.photo || "",
     tags: partner.tags || [],
     notes: partner.notes || "",
+    revisit: Boolean(partner.revisit),
   }));
 }
 
@@ -191,15 +259,22 @@ function renderDashboard() {
     ? (state.encounters.reduce((sum, item) => sum + Number(item.mood || 0), 0) / state.encounters.length).toFixed(1)
     : "-";
   const sorted = sortedEncounters();
+  const lastEncounter = sorted[0];
 
   $("#monthCount").textContent = monthItems.length;
   $("#partnerCount").textContent = state.partners.length;
   $("#safeRate").textContent = `${safeRate}%`;
   $("#moodAverage").textContent = moodAverage;
-  $("#lastDate").textContent = sorted[0] ? shortDate(sorted[0].date) : "-";
 
-  const bars = Array.from({ length: 7 }, (_, index) => {
-    const date = addDays(now, index - 6);
+  if (lastEncounter) {
+    const ago = timeAgo(lastEncounter.date);
+    $("#lastDate").innerHTML = `${shortDate(lastEncounter.date)}<br><small style="font-size:0.6rem;font-weight:500;opacity:0.8">${ago}</small>`;
+  } else {
+    $("#lastDate").textContent = "-";
+  }
+
+  const bars = Array.from({ length: SPARKLINE_DAYS }, (_, index) => {
+    const date = addDays(now, index - (SPARKLINE_DAYS - 1));
     return state.encounters.filter((item) => item.date === toInputDate(date)).length;
   });
   const max = Math.max(...bars, 1);
@@ -207,14 +282,20 @@ function renderDashboard() {
     .map((value) => `<span style="height:${Math.max(12, (value / max) * 100)}%"></span>`)
     .join("");
 
-  $("#recentList").innerHTML = sorted.slice(0, 3).map(eventCard).join("") || emptyState("Nessun incontro registrato.");
+  $("#recentList").innerHTML =
+    sorted.slice(0, RECENT_ITEMS_LIMIT).map(eventCard).join("") || emptyState("Nessun incontro registrato.");
   bindEventCards();
+  renderInsights();
 }
 
 function renderStats() {
   const now = new Date();
-  if (!$("#statsMonth").value) $("#statsMonth").value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  if (!$("#statsYear").value) $("#statsYear").value = now.getFullYear();
+  if (!$("#statsMonth").value) {
+    $("#statsMonth").value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
+  }
+  if (!$("#statsYear").value) {
+    $("#statsYear").value = now.getFullYear();
+  }
 
   const scope = $("#statsScope").value;
   const items = encountersForStats(scope);
@@ -223,8 +304,9 @@ function renderStats() {
   const safeRate = safeItems.length
     ? Math.round((safeItems.filter((item) => item.safe === "yes").length / safeItems.length) * 100)
     : 0;
-  const moodAverage = items.length
-    ? (items.reduce((sum, item) => sum + Number(item.mood || 0), 0) / items.length).toFixed(1)
+  const moodItems = items.filter((item) => Number(item.mood || 0) > 0);
+  const moodAverage = moodItems.length
+    ? (moodItems.reduce((sum, item) => sum + Number(item.mood), 0) / moodItems.length).toFixed(1)
     : "-";
   const firstTimes = items.filter((item) => isFirstEncounter(item)).length;
 
@@ -234,7 +316,7 @@ function renderStats() {
   $("#statsGrid").innerHTML = [
     statCard("Incontri", items.length),
     statCard("Partner", partners.size),
-    statCard("Mood medio", moodAverage),
+    statCard("Voto medio", moodAverage),
     statCard("Protetti", `${safeRate}%`),
     statCard("Prime volte", firstTimes),
     statCard("Tag diversi", uniqueTags(items).size),
@@ -242,6 +324,123 @@ function renderStats() {
 
   renderTopPartners(items);
   renderMoodChart(items);
+  renderInsights();
+}
+
+const WEEKDAYS_IT = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
+
+function computeInsights() {
+  const encounters = sortedEncounters();
+  if (encounters.length < 2) return [];
+
+  const insights = [];
+
+  const dayCounts = encounters.reduce((map, item) => {
+    const day = parseDate(item.date).getDay();
+    map[day] = (map[day] || 0) + 1;
+    return map;
+  }, {});
+  const topDay = Object.entries(dayCounts).sort((a, b) => b[1] - a[1])[0];
+  if (topDay && topDay[1] >= 2) {
+    insights.push({
+      emoji: "📅",
+      title: `Giorno preferito: ${WEEKDAYS_IT[topDay[0]]}`,
+      detail: `${topDay[1]} incontri capitano di ${WEEKDAYS_IT[topDay[0]]}`,
+    });
+  }
+
+  const scored = encounters.filter((item) => Number(item.mood || 0) > 0);
+  if (scored.length >= 4) {
+    const half = Math.floor(scored.length / 2);
+    const recent = scored.slice(0, half);
+    const older = scored.slice(half);
+    const avg = (list) => list.reduce((s, i) => s + Number(i.mood), 0) / list.length;
+    const recentAvg = avg(recent);
+    const olderAvg = avg(older);
+    const delta = recentAvg - olderAvg;
+    const trend = delta > 0.3 ? "in salita ↗" : delta < -0.3 ? "in calo ↘" : "stabile →";
+    insights.push({
+      emoji: delta > 0.3 ? "📈" : delta < -0.3 ? "📉" : "➖",
+      title: `Voto medio ${trend}`,
+      detail: `Ultimi ${recentAvg.toFixed(1)} vs ${olderAvg.toFixed(1)} di prima`,
+    });
+  }
+
+  const dates = encounters.map((item) => parseDate(item.date).getTime()).sort((a, b) => a - b);
+  if (dates.length >= 3) {
+    let totalGap = 0;
+    for (let i = 1; i < dates.length; i++) totalGap += dates[i] - dates[i - 1];
+    const avgDays = Math.round(totalGap / (dates.length - 1) / (1000 * 60 * 60 * 24));
+    if (avgDays > 0) {
+      insights.push({
+        emoji: "⏱️",
+        title: `Circa ogni ${avgDays} giorni`,
+        detail: "È il tuo ritmo medio tra un incontro e l'altro",
+      });
+    }
+  }
+
+  const safeItems = encounters.filter((item) => item.safe === "yes" || item.safe === "no");
+  if (safeItems.length >= 3) {
+    const rate = Math.round((safeItems.filter((i) => i.safe === "yes").length / safeItems.length) * 100);
+    insights.push({
+      emoji: rate >= 80 ? "🛡️" : "⚠️",
+      title: `Protezione al ${rate}%`,
+      detail: rate >= 80 ? "Stai attenta, bel lavoro" : "Forse vale la pena tenerne conto",
+    });
+  }
+
+  const counts = encounters.reduce((map, item) => {
+    map.set(item.partnerId, (map.get(item.partnerId) || 0) + 1);
+    return map;
+  }, new Map());
+  const topPartner = [...counts.entries()].sort((a, b) => b[1] - a[1])[0];
+  if (topPartner && topPartner[1] >= 3) {
+    const partner = getPartner(topPartner[0]);
+    if (partner) {
+      insights.push({
+        emoji: "💞",
+        title: `Più presente: ${partnerLabel(partner)}`,
+        detail: `${topPartner[1]} incontri insieme`,
+      });
+    }
+  }
+
+  return insights;
+}
+
+function renderInsights() {
+  const insights = computeInsights();
+  const grid = $("#insightGrid");
+  if (grid) {
+    grid.innerHTML =
+      insights
+        .map(
+          (insight) => `
+            <div class="insight-card">
+              <span class="insight-emoji">${insight.emoji}</span>
+              <div class="insight-body">
+                <strong>${escapeHtml(insight.title)}</strong>
+                <span>${escapeHtml(insight.detail)}</span>
+              </div>
+            </div>
+          `,
+        )
+        .join("") || emptyState("Aggiungi qualche incontro per scoprire i pattern.");
+  }
+
+  const mini = $("#miniInsight");
+  if (mini) {
+    if (insights.length) {
+      const pick = insights[0];
+      $("#miniInsightEmoji").textContent = pick.emoji;
+      $("#miniInsightTitle").textContent = pick.title;
+      $("#miniInsightDetail").textContent = pick.detail;
+      mini.classList.remove("hidden");
+    } else {
+      mini.classList.add("hidden");
+    }
+  }
 }
 
 function encountersForStats(scope) {
@@ -281,7 +480,7 @@ function renderTopPartners(items) {
     .map(([partnerId, count]) => ({ partner: getPartner(partnerId), count }))
     .filter((row) => row.partner)
     .sort((a, b) => b.count - a.count)
-    .slice(0, 5);
+    .slice(0, TOP_PARTNERS_LIMIT);
   const max = Math.max(...rows.map((row) => row.count), 1);
 
   $("#topPartners").innerHTML =
@@ -299,15 +498,50 @@ function renderTopPartners(items) {
 }
 
 function renderMoodChart(items) {
-  const chronological = [...items].sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
+  const chronological = [...items]
+    .filter((item) => Number(item.mood || 0) > 0)
+    .sort((a, b) => a.date.localeCompare(b.date))
+    .slice(-MOOD_CHART_LIMIT);
+  const chart = $("#moodChart");
+  const axis = $("#moodAxis");
   const max = 5;
-  $("#moodChart").innerHTML =
+
+  if (!chronological.length) {
+    chart.innerHTML = emptyState("Aggiungi incontri con un voto per vedere il trend.");
+    if (axis) axis.innerHTML = "";
+    return;
+  }
+
+  const avg = chronological.reduce((sum, item) => sum + Number(item.mood), 0) / chronological.length;
+  const avgPct = (avg / max) * 100;
+
+  chart.innerHTML =
+    `<div class="mood-avg-line" style="bottom:${avgPct}%"><span>media ${avg.toFixed(1)}</span></div>` +
     chronological
       .map((item) => {
-        const height = Math.max(8, (Number(item.mood || 0) / max) * 100);
-        return `<span style="height:${height}%" title="${shortDate(item.date)}"></span>`;
+        const mood = Number(item.mood);
+        const height = Math.max(10, (mood / max) * 100);
+        const low = mood <= 2 ? "low" : "";
+        const unsafe = item.safe === "no" ? "unsafe" : "";
+        const partner = getPartner(item.partnerId);
+        const label = `${shortDate(item.date)} · ${mood}/5${partner ? ` · ${partnerLabel(partner)}` : ""}${
+          item.safe === "yes" ? " · protetto" : item.safe === "no" ? " · non protetto" : ""
+        }`;
+        return `<div class="mood-bar ${low} ${unsafe}" title="${escapeHtml(label)}">
+          <i style="height:${height}%"></i>
+          ${item.safe ? '<span class="mood-dot"></span>' : ""}
+        </div>`;
       })
-      .join("") || emptyState("Aggiungi incontri per vedere il trend.");
+      .join("");
+
+  if (axis) {
+    const first = chronological[0];
+    const last = chronological[chronological.length - 1];
+    axis.innerHTML =
+      chronological.length > 1
+        ? `<span>${shortDate(first.date)}</span><span>${shortDate(last.date)}</span>`
+        : `<span>${shortDate(first.date)}</span>`;
+  }
 }
 
 function renderLists() {
@@ -329,6 +563,7 @@ function renderPartners() {
       .map((partner) => {
         const count = state.encounters.filter((item) => item.partnerId === partner.id).length;
         const last = sortedEncounters().find((item) => item.partnerId === partner.id);
+        const avg = partnerAvgMood(partner.id);
         return `
           <article class="partner-card">
             <button class="edit-chip" data-edit-partner="${partner.id}" type="button" aria-label="Modifica partner">
@@ -336,9 +571,11 @@ function renderPartners() {
             </button>
             <div class="partner-row">
               ${avatarHtml(partner)}
-              <div>
-                <strong class="private-text">${escapeHtml(partner.name)}</strong>
-                ${partner.alias ? `<p class="meta private-text">${escapeHtml(partner.alias)}</p>` : ""}
+              <div class="partner-name-block">
+                <strong class="private-text">${escapeHtml(partner.alias || partner.name)}</strong>
+                ${partner.alias && partner.name ? `<p class="meta private-text">${escapeHtml(partner.name)}</p>` : ""}
+                ${avg !== null ? `<div class="partner-stars">${renderStarsReadonly(avg)}</div>` : ""}
+                ${partner.revisit ? `<span class="revisit-badge">Da rivedere</span>` : ""}
               </div>
             </div>
             <p class="meta">${count} incontri${last ? `, ultimo ${shortDate(last.date)}` : ""}</p>
@@ -405,10 +642,25 @@ function renderPartnerOptions() {
   $("#partnerSuggestions").innerHTML = suggestions;
 }
 
-function eventCard(item) {
-  const partner = getPartner(item.partnerId);
+function formatSafetyPill(item) {
   const safeText = item.safe === "yes" ? "Protetto" : "Non protetto";
   const safeClass = item.safe === "yes" ? "safe" : item.safe === "no" ? "risk" : "";
+  return `<span class="pill ${safeClass}">${safeText}</span>`;
+}
+
+function formatMoodPill(item) {
+  const mood = Number(item.mood || 0);
+  return `<span class="pill pill-mood">${renderStarsInline(mood)}</span>`;
+}
+
+function bindEventCards() {
+  $$("[data-edit-encounter]").forEach((button) => {
+    button.addEventListener("click", () => openEncounterDialog(button.dataset.editEncounter));
+  });
+}
+
+function eventCard(item) {
+  const partner = getPartner(item.partnerId);
   const isFirst = isFirstEncounter(item);
   return `
     <article class="event-card">
@@ -421,13 +673,44 @@ function eventCard(item) {
       </div>
       <div class="tag-row">
         ${isFirst ? '<span class="pill first-time">Prima volta</span>' : ""}
-        <span class="pill ${safeClass}">${safeText}</span>
-        <span class="pill">Mood ${moodStars(Number(item.mood || 0))}</span>
+        ${formatSafetyPill(item)}
+        ${formatMoodPill(item)}
         ${tagsHtml(item.tags)}
       </div>
       ${item.notes ? `<p class="private-text">${escapeHtml(item.notes)}</p>` : ""}
     </article>
   `;
+}
+
+function renderStarsInline(value) {
+  if (value === 0) return '<span class="stars-inline stars-empty">☆☆☆☆☆</span>';
+  let html = '<span class="stars-inline">';
+  for (let i = 1; i <= 5; i++) {
+    if (i <= Math.floor(value)) {
+      html += '<span class="star-full">★</span>';
+    } else if (i - 0.5 <= value) {
+      html += '<span class="star-half">★</span>';
+    } else {
+      html += '<span class="star-empty">☆</span>';
+    }
+  }
+  html += "</span>";
+  return html;
+}
+
+function renderStarsReadonly(value) {
+  let html = '<span class="stars-readonly">';
+  for (let i = 1; i <= 5; i++) {
+    if (i <= Math.floor(value)) {
+      html += '<span class="star-full">★</span>';
+    } else if (i - 0.5 <= value) {
+      html += '<span class="star-half">★</span>';
+    } else {
+      html += '<span class="star-empty">☆</span>';
+    }
+  }
+  html += `<span class="stars-value">${value.toFixed(1)}</span></span>`;
+  return html;
 }
 
 function tagsHtml(tags = []) {
@@ -442,7 +725,6 @@ function avatarHtml(partner) {
   if (partner.photo) {
     return `<img class="avatar" src="${partner.photo}" alt="" />`;
   }
-
   return `<span class="avatar">${escapeHtml((partner.alias || partner.name || "?").slice(0, 1).toUpperCase())}</span>`;
 }
 
@@ -460,32 +742,41 @@ function findPartnerByName(value) {
 
 function isFirstEncounter(item) {
   const partnerItems = sortedEncounters().filter((encounter) => encounter.partnerId === item.partnerId);
+  // sortedEncounters() is desc, so the oldest is last
   return partnerItems.length > 0 && partnerItems[partnerItems.length - 1].id === item.id;
 }
 
-function moodStars(value) {
-  const full = Math.floor(value);
-  const half = value % 1 >= 0.5;
-  return `${"★".repeat(full)}${half ? "½" : ""}${value === 0 ? "0" : ""}`;
-}
-
-function bindEventCards() {
-  $$("[data-edit-encounter]").forEach((button) => {
-    button.addEventListener("click", () => openEncounterDialog(button.dataset.editEncounter));
-  });
+function partnerAvgMood(partnerId) {
+  const items = state.encounters.filter((e) => e.partnerId === partnerId && Number(e.mood || 0) > 0);
+  if (!items.length) return null;
+  return items.reduce((sum, e) => sum + Number(e.mood), 0) / items.length;
 }
 
 function buildStarRating() {
-  const zero = '<button type="button" data-mood="0" aria-label="Mood 0">0</button>';
-  $("#starRating").innerHTML = zero + Array.from({ length: 10 }, (_, index) => {
-    const value = (index + 1) / 2;
-    const label = value % 1 === 0 ? `${value}` : `${Math.floor(value)}.5`;
-    return `<button type="button" data-mood="${value}" aria-label="Mood ${label}">★</button>`;
+  const container = $("#starRating");
+  container.innerHTML = Array.from({ length: 5 }, (_, index) => {
+    const value = index + 1;
+    return `<button class="star-button" type="button" data-star="${value}" aria-label="Voto ${value}">
+      <span class="star-icon star-empty-icon">☆</span>
+      <span class="star-icon star-full-icon">★</span>
+      <span class="star-icon star-half-icon">⭐</span>
+    </button>`;
   }).join("");
 
-  $$("#starRating button").forEach((button) => {
+  $$("#starRating .star-button").forEach((button) => {
     button.addEventListener("click", () => {
-      $("#encounterMood").value = button.dataset.mood;
+      const value = Number(button.dataset.star);
+      const current = Number($("#encounterMood").value || 0);
+      if (current === value) {
+        // full → half
+        $("#encounterMood").value = value - 0.5;
+      } else if (current === value - 0.5) {
+        // half → empty (zero this star)
+        $("#encounterMood").value = value - 1;
+      } else {
+        // set full
+        $("#encounterMood").value = value;
+      }
       updateStarRating();
     });
   });
@@ -493,11 +784,18 @@ function buildStarRating() {
 
 function updateStarRating() {
   const mood = Number($("#encounterMood").value || 0);
-  $$("#starRating button").forEach((button) => {
-    button.classList.toggle("active", Number(button.dataset.mood) <= mood);
-    button.classList.toggle("half-step", Number(button.dataset.mood) % 1 !== 0);
+  $$("#starRating .star-button").forEach((button) => {
+    const value = Number(button.dataset.star);
+    const isFull = value <= mood;
+    const isHalf = value - 0.5 === mood;
+    const isEmpty = !isFull && !isHalf;
+    button.dataset.state = isFull ? "full" : isHalf ? "half" : "empty";
+    button.classList.toggle("star-active", isFull);
+    button.classList.toggle("star-half-active", isHalf);
+    button.classList.toggle("star-inactive", isEmpty);
   });
-  $("#moodValue").textContent = `${mood.toFixed(mood % 1 ? 1 : 0)} / 5`;
+  const label = mood === 0 ? "Nessun voto" : `${mood.toFixed(mood % 1 ? 1 : 0)} / 5`;
+  $("#moodValue").textContent = label;
 }
 
 function updateNewPartnerHint() {
@@ -506,7 +804,6 @@ function updateNewPartnerHint() {
     $("#newPartnerHint").textContent = "";
     return;
   }
-
   $("#newPartnerHint").textContent = findPartnerByName(value)
     ? "Partner già presente"
     : "Nuovo partner: verrà aggiunto salvando l'incontro";
@@ -515,7 +812,6 @@ function updateNewPartnerHint() {
 function handlePartnerPhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-
   const reader = new FileReader();
   reader.onload = () => {
     partnerPhotoData = String(reader.result || "");
@@ -533,7 +829,6 @@ function renderPhotoPreview() {
 function handleProfilePhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-
   const reader = new FileReader();
   reader.onload = () => {
     state.profilePhoto = String(reader.result || "");
@@ -544,10 +839,15 @@ function handleProfilePhoto(event) {
 }
 
 function renderProfilePhoto() {
-  $(".profile-avatar").innerHTML = state.profilePhoto
-    ? `<img src="${state.profilePhoto}" alt="" /><input id="profilePhoto" type="file" accept="image/*" />`
-    : `${icons.heart}<input id="profilePhoto" type="file" accept="image/*" />`;
-  $("#profilePhoto").addEventListener("change", handleProfilePhoto);
+  const avatar = $(".profile-avatar");
+  const input = avatar.querySelector("input");
+  // preserve the existing input element to avoid re-binding
+  const photoContent = state.profilePhoto
+    ? `<img src="${state.profilePhoto}" alt="" />`
+    : icons.heart;
+  const existing = avatar.querySelector("img, [data-icon], svg");
+  if (existing) existing.remove();
+  avatar.insertAdjacentHTML("afterbegin", photoContent);
 }
 
 function setTab(tab) {
@@ -569,7 +869,7 @@ function openEncounterDialog(id = "", date = "") {
   const partner = item ? getPartner(item.partnerId) : null;
   $("#encounterDate").value = item?.date || date || selectedDate || toInputDate(new Date());
   $("#encounterPartnerName").value = partner ? partnerLabel(partner) : "";
-  $("#encounterMood").value = item?.mood || 4;
+  $("#encounterMood").value = item?.mood ?? 4;
   $("#encounterTags").value = (item?.tags || []).join(", ");
   $("#encounterNotes").value = item?.notes || "";
   selectedSafe = item?.safe === "no" ? "no" : "yes";
@@ -578,6 +878,7 @@ function openEncounterDialog(id = "", date = "") {
   });
   updateStarRating();
   updateNewPartnerHint();
+  goToStep(1);
   $("#deleteEntryButton").classList.toggle("hidden", !id);
   $("#entryDialog").showModal();
 }
@@ -596,6 +897,23 @@ function openPartnerDialog(id = "") {
   $("#partnerTags").value = (partner?.tags || []).join(", ");
   $("#partnerNotes").value = partner?.notes || "";
   $("#partnerPhoto").value = "";
+
+  selectedRevisit = Boolean(partner?.revisit);
+  $$("#revisitGroup button").forEach((button) => {
+    button.classList.toggle("active", (button.dataset.revisit === "yes") === selectedRevisit);
+  });
+
+  const avg = id ? partnerAvgMood(id) : null;
+  const avgEl = $("#partnerAvgMood");
+  if (avgEl) {
+    if (avg !== null) {
+      avgEl.innerHTML = `Media incontri: ${renderStarsReadonly(avg)}`;
+      avgEl.classList.remove("hidden");
+    } else {
+      avgEl.classList.add("hidden");
+    }
+  }
+
   renderPhotoPreview();
   $("#deleteEntryButton").classList.toggle("hidden", !id);
   $("#entryDialog").showModal();
@@ -605,12 +923,20 @@ function syncDialogMode() {
   const isPartner = $("#entryType").value === "partner";
   $("#partnerFields").classList.toggle("hidden", !isPartner);
   $("#encounterFields").classList.toggle("hidden", isPartner);
+  if (isPartner) {
+    $("#saveEntryButton").classList.remove("hidden");
+  }
 }
 
 function saveEntry(event) {
   event.preventDefault();
   const type = $("#entryType").value;
   const id = $("#entryId").value;
+
+  if (type === "encounter" && wizardStep < WIZARD_STEPS) {
+    nextStep();
+    return;
+  }
 
   if (type === "partner") {
     const name = $("#partnerName").value.trim();
@@ -623,6 +949,7 @@ function saveEntry(event) {
       photo: partnerPhotoData,
       tags: splitTags($("#partnerTags").value),
       notes: $("#partnerNotes").value.trim(),
+      revisit: selectedRevisit,
     };
     state.partners = id ? state.partners.map((item) => (item.id === id ? payload : item)) : [payload, ...state.partners];
   } else {
@@ -634,10 +961,11 @@ function saveEntry(event) {
         id: crypto.randomUUID(),
         name: partnerName,
         alias: "",
-        firstDate: $("#encounterDate").value || toInputDate(new Date()),
+        firstDate: "",
         photo: "",
         tags: [],
         notes: "",
+        revisit: false,
       };
       state.partners = [partner, ...state.partners];
     }
@@ -696,9 +1024,13 @@ function importData(event) {
   reader.onload = () => {
     try {
       const imported = JSON.parse(reader.result);
+      if (!Array.isArray(imported.partners) || !Array.isArray(imported.encounters)) {
+        alert("File non valido: struttura dati non riconosciuta.");
+        return;
+      }
       state = {
-        partners: normalizePartners(imported.partners || []),
-        encounters: imported.encounters || [],
+        partners: normalizePartners(imported.partners),
+        encounters: imported.encounters,
         notes: imported.notes || "",
         profilePhoto: imported.profilePhoto || "",
       };
@@ -735,7 +1067,8 @@ function splitTags(value) {
   return value
     .split(",")
     .map((tag) => tag.trim())
-    .filter(Boolean);
+    .filter(Boolean)
+    .filter((tag, idx, arr) => arr.indexOf(tag) === idx);
 }
 
 function parseDate(value) {
@@ -761,6 +1094,20 @@ function toInputDate(date) {
 
 function shortDate(value) {
   return parseDate(value).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
+}
+
+function timeAgo(value) {
+  const date = parseDate(value);
+  const now = new Date();
+  const diffDays = Math.floor((now - date) / (1000 * 60 * 60 * 24));
+  if (diffDays === 0) return "oggi";
+  if (diffDays === 1) return "ieri";
+  if (diffDays < 7) return `${diffDays} giorni fa`;
+  if (diffDays < 14) return "1 settimana fa";
+  if (diffDays < 30) return `${Math.floor(diffDays / 7)} settimane fa`;
+  if (diffDays < 60) return "1 mese fa";
+  if (diffDays < 365) return `${Math.floor(diffDays / 30)} mesi fa`;
+  return `${Math.floor(diffDays / 365)} anni fa`;
 }
 
 function escapeHtml(value = "") {
