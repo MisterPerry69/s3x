@@ -815,15 +815,44 @@ function updateNewPartnerHint() {
     : "Nuovo partner: verrà aggiunto salvando l'incontro";
 }
 
+const PHOTO_MAX_SIZE = 900;
+const PHOTO_QUALITY = 0.8;
+
+function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = reject;
+    reader.onload = () => {
+      const img = new Image();
+      img.onerror = reject;
+      img.onload = () => {
+        const scale = Math.min(1, PHOTO_MAX_SIZE / Math.max(img.width, img.height));
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.round(img.width * scale);
+        canvas.height = Math.round(img.height * scale);
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        try {
+          resolve(canvas.toDataURL("image/jpeg", PHOTO_QUALITY));
+        } catch {
+          resolve(String(reader.result || "")); // fallback: original data URL
+        }
+      };
+      img.src = String(reader.result || "");
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
 function handlePartnerPhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    partnerPhotoData = String(reader.result || "");
-    renderPhotoPreview();
-  };
-  reader.readAsDataURL(file);
+  compressImage(file)
+    .then((dataUrl) => {
+      partnerPhotoData = dataUrl;
+      renderPhotoPreview();
+    })
+    .catch(() => {});
 }
 
 function renderPhotoPreview() {
@@ -835,13 +864,13 @@ function renderPhotoPreview() {
 function handleProfilePhoto(event) {
   const file = event.target.files?.[0];
   if (!file) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    state.profilePhoto = String(reader.result || "");
-    saveState();
-    renderProfilePhoto();
-  };
-  reader.readAsDataURL(file);
+  compressImage(file)
+    .then((dataUrl) => {
+      state.profilePhoto = dataUrl;
+      saveState();
+      renderProfilePhoto();
+    })
+    .catch(() => {});
 }
 
 function renderProfilePhoto() {
