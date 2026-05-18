@@ -419,7 +419,7 @@ function computeInsights() {
     if (partner) {
       insights.push({
         emoji: "💞",
-        title: `Più presente: ${partnerLabel(partner)}`,
+        title: `Più presente: ${partnerDisplay(partner)}`,
         detail: `${topPartner[1]} incontri insieme`,
       });
     }
@@ -507,7 +507,7 @@ function renderTopPartners(items) {
       .map(
         (row) => `
           <div class="bar-row">
-            <span>${escapeHtml(partnerLabel(row.partner))}</span>
+            <span>${escapeHtml(partnerDisplay(row.partner))}</span>
             <strong>${row.count}</strong>
             <div><i style="width:${(row.count / max) * 100}%"></i></div>
           </div>
@@ -543,7 +543,7 @@ function renderMoodChart(items) {
         const low = mood <= 2 ? "low" : "";
         const unsafe = item.safe === "no" ? "unsafe" : "";
         const partner = getPartner(item.partnerId);
-        const label = `${shortDate(item.date)} · ${mood}/5${partner ? ` · ${partnerLabel(partner)}` : ""}${
+        const label = `${shortDate(item.date)} · ${mood}/5${partner ? ` · ${partnerDisplay(partner)}` : ""}${
           item.safe === "yes" ? " · protetto" : item.safe === "no" ? " · non protetto" : ""
         }`;
         return `<div class="mood-bar ${low} ${unsafe}" title="${escapeHtml(label)}">
@@ -639,7 +639,7 @@ function renderPartners() {
               </div>
             </div>
             <p class="meta">${count} incontri${last ? `, ultimo ${shortDate(last.date)}` : ""}</p>
-            ${partner.firstDate ? `<p class="meta">Prima volta: ${shortDate(partner.firstDate)}</p>` : ""}
+            ${partner.firstDate ? `<p class="meta">Prima volta: ${fullDate(partner.firstDate)}</p>` : ""}
             ${partner.metVia ? `<p class="meta">Conosciuta su: ${escapeHtml(partner.metVia)}</p>` : ""}
             <div class="tag-row">${tagsHtml(partner.tags, "partner")}</div>
             ${partner.notes ? `<p class="private-text">${escapeHtml(partner.notes)}</p>` : ""}
@@ -736,10 +736,9 @@ function eventCard(item) {
   const partner = getPartner(item.partnerId);
   const isFirst = isFirstEncounter(item);
   const metVia = partner?.metVia;
-  const firstYear = item.date ? item.date.slice(0, 4) : "";
   const statusRow = [
     isFirst
-      ? `<button type="button" class="pill pill-tag first-time" data-tag="first" data-tag-kind="encounter" data-filter-type="first">Prima volta${firstYear ? ` · ${firstYear}` : ""}</button>`
+      ? `<button type="button" class="pill pill-tag first-time" data-tag="first" data-tag-kind="encounter" data-filter-type="first">Prima volta</button>`
       : "",
     formatSafetyPill(item),
     metVia ? `<span class="pill pill-soft">Conosciuta su ${escapeHtml(metVia)}</span>` : "",
@@ -754,7 +753,7 @@ function eventCard(item) {
       </button>
       <div class="event-top">
         <span class="event-date meta">${shortDate(item.date)}</span>
-        <strong class="event-name private-text">${escapeHtml(partner ? partnerLabel(partner) : "Senza nome")}</strong>
+        <strong class="event-name private-text">${escapeHtml(partnerDisplay(partner))}</strong>
         <span class="event-mood">${renderStarsInline(Number(item.mood || 0))}</span>
       </div>
       ${statusRow ? `<div class="tag-row status-row">${statusRow}</div>` : ""}
@@ -839,6 +838,12 @@ function avatarHtml(partner) {
 
 function partnerLabel(partner) {
   if (partner.alias && partner.name) return `${partner.name} (${partner.alias})`;
+  return partner.alias || partner.name || "Senza nome";
+}
+
+// What the user sees on cards/charts: alias only, name as fallback.
+function partnerDisplay(partner) {
+  if (!partner) return "Senza nome";
   return partner.alias || partner.name || "Senza nome";
 }
 
@@ -1248,6 +1253,10 @@ function toInputDate(date) {
 
 function shortDate(value) {
   return parseDate(value).toLocaleDateString("it-IT", { day: "2-digit", month: "short" });
+}
+
+function fullDate(value) {
+  return parseDate(value).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 function timeAgo(value) {
