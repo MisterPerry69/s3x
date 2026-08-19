@@ -1459,6 +1459,152 @@ label {
   object-fit: cover;
 }
 
+/* ─── MULTI-DATE BLOCK ─── */
+
+.multi-date-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border-radius: var(--radius-sm);
+  background: var(--card-soft);
+  border: 1px solid var(--line);
+}
+
+.multi-date-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--plum);
+}
+
+.multi-date-picker {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.multi-date-picker input[type="date"] {
+  flex: 1 1 140px;
+  padding: 8px 10px;
+  border-radius: var(--radius-xs);
+  border: 1px solid var(--line-strong);
+  background: #fff;
+}
+
+.chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip-row:empty {
+  display: none;
+}
+
+.date-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--peach-soft);
+  color: var(--plum);
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+}
+
+.date-chip button {
+  display: grid;
+  place-items: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border-radius: 50%;
+  border: none;
+  background: rgba(70, 48, 66, 0.15);
+  color: var(--plum);
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.date-chip button:hover {
+  background: rgba(70, 48, 66, 0.3);
+}
+
+.ghost-button.small,
+.primary-button.small {
+  padding: 6px 12px;
+  font-size: 0.82rem;
+  border-radius: var(--radius-xs);
+}
+
+.ghost-button.small [data-icon],
+.primary-button.small [data-icon] {
+  width: 14px;
+  height: 14px;
+}
+
+/* ─── PHOTO LIGHTBOX ─── */
+
+.photo-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(30, 18, 26, 0.88);
+  backdrop-filter: blur(4px);
+  animation: lightbox-in 0.18s ease-out;
+}
+
+.photo-lightbox.hidden {
+  display: none;
+}
+
+.photo-lightbox img {
+  max-width: 100%;
+  max-height: 100%;
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  object-fit: contain;
+}
+
+.lightbox-close {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.95);
+  color: var(--plum);
+  box-shadow: var(--shadow-sm);
+}
+
+.lightbox-close [data-icon] {
+  width: 20px;
+  height: 20px;
+}
+
+img.avatar {
+  cursor: zoom-in;
+}
+
+@keyframes lightbox-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 menu {
   justify-content: space-between;
   padding: 0;

@@ -242,7 +242,22 @@
           <label>
             Prima volta
             <input id="partnerFirstDate" type="date" />
+            <span class="helper-text">Verrà creato un incontro in quella data (se non esiste già).</span>
           </label>
+          <div class="multi-date-block">
+            <div class="multi-date-header">
+              <span>Altri incontri</span>
+              <button class="ghost-button small" id="addPartnerExtraDateButton" type="button">
+                <span data-icon="plus"></span> Aggiungi data
+              </button>
+            </div>
+            <div class="multi-date-picker hidden" id="partnerExtraDatePicker">
+              <input id="partnerExtraDateInput" type="date" />
+              <button class="primary-button small" id="confirmPartnerExtraDateButton" type="button">OK</button>
+              <button class="ghost-button small" id="cancelPartnerExtraDateButton" type="button">Annulla</button>
+            </div>
+            <div class="chip-row date-chip-row" id="partnerExtraDatesList"></div>
+          </div>
           <label>
             Conosciuta su
             <input id="partnerMetVia" list="metViaSuggestions" type="text" placeholder="Tinder, Instagram, dal vivo..." autocomplete="off" />
@@ -286,6 +301,21 @@
               <datalist id="partnerSuggestions"></datalist>
               <span class="helper-text" id="newPartnerHint"></span>
             </label>
+            <div class="multi-date-block">
+              <div class="multi-date-header">
+                <span>Altre date con lo stesso partner</span>
+                <button class="ghost-button small" id="addEncounterExtraDateButton" type="button">
+                  <span data-icon="plus"></span> Aggiungi data
+                </button>
+              </div>
+              <div class="multi-date-picker hidden" id="encounterExtraDatePicker">
+                <input id="encounterExtraDateInput" type="date" />
+                <button class="primary-button small" id="confirmEncounterExtraDateButton" type="button">OK</button>
+                <button class="ghost-button small" id="cancelEncounterExtraDateButton" type="button">Annulla</button>
+              </div>
+              <div class="chip-row date-chip-row" id="encounterExtraDatesList"></div>
+              <span class="helper-text" id="extraDatesHint"></span>
+            </div>
           </div>
 
           <div class="wizard-step" data-step="2">
@@ -336,6 +366,13 @@
         </menu>
       </form>
     </dialog>
+
+    <div class="photo-lightbox hidden" id="photoLightbox" aria-hidden="true">
+      <button class="lightbox-close" id="lightboxClose" type="button" aria-label="Chiudi immagine">
+        <span data-icon="x"></span>
+      </button>
+      <img id="lightboxImage" alt="" />
+    </div>
 
     <script src="app.js"></script>
   </body>

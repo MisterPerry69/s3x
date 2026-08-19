@@ -95,6 +95,8 @@ let partnerTagFilter = "";
 let logFilter = null; // { type: "tag" | "safe" | "first", value }
 let wizardStep = 1;
 const WIZARD_STEPS = 3;
+let extraEncounterDates = [];
+let extraPartnerDates = [];
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -171,7 +173,132 @@ function wireEvents() {
   $("#wizardPrev")?.addEventListener("click", prevStep);
   $("#wizardNext")?.addEventListener("click", nextStep);
 
+  wireExtraDateControls({
+    scope: "encounter",
+    addBtn: "#addEncounterExtraDateButton",
+    picker: "#encounterExtraDatePicker",
+    input: "#encounterExtraDateInput",
+    confirm: "#confirmEncounterExtraDateButton",
+    cancel: "#cancelEncounterExtraDateButton",
+  });
+  wireExtraDateControls({
+    scope: "partner",
+    addBtn: "#addPartnerExtraDateButton",
+    picker: "#partnerExtraDatePicker",
+    input: "#partnerExtraDateInput",
+    confirm: "#confirmPartnerExtraDateButton",
+    cancel: "#cancelPartnerExtraDateButton",
+  });
+
+  wireLightbox();
+
   buildStarRating();
+}
+
+function wireExtraDateControls({ scope, addBtn, picker, input, confirm, cancel }) {
+  const pickerEl = $(picker);
+  const inputEl = $(input);
+  $(addBtn)?.addEventListener("click", () => {
+    pickerEl.classList.remove("hidden");
+    if (!inputEl.value) inputEl.value = toInputDate(new Date());
+    inputEl.focus();
+  });
+  $(cancel)?.addEventListener("click", () => {
+    pickerEl.classList.add("hidden");
+    inputEl.value = "";
+  });
+  $(confirm)?.addEventListener("click", () => {
+    const value = inputEl.value;
+    if (!value) return;
+    addExtraDate(scope, value);
+    pickerEl.classList.add("hidden");
+    inputEl.value = "";
+  });
+}
+
+function addExtraDate(scope, value) {
+  const list = scope === "partner" ? extraPartnerDates : extraEncounterDates;
+  if (list.includes(value)) return;
+  list.push(value);
+  list.sort();
+  renderExtraDates(scope);
+}
+
+function removeExtraDate(scope, value) {
+  if (scope === "partner") {
+    extraPartnerDates = extraPartnerDates.filter((d) => d !== value);
+  } else {
+    extraEncounterDates = extraEncounterDates.filter((d) => d !== value);
+  }
+  renderExtraDates(scope);
+}
+
+function renderExtraDates(scope) {
+  const list = scope === "partner" ? extraPartnerDates : extraEncounterDates;
+  const container = scope === "partner" ? $("#partnerExtraDatesList") : $("#encounterExtraDatesList");
+  if (!container) return;
+  container.innerHTML = list
+    .map(
+      (date) => `
+        <span class="date-chip">
+          ${escapeHtml(shortDate(date))}
+          <button type="button" data-remove-date="${date}" aria-label="Rimuovi">✕</button>
+        </span>
+      `,
+    )
+    .join("");
+  $$("[data-remove-date]", container).forEach((btn) => {
+    btn.addEventListener("click", () => removeExtraDate(scope, btn.dataset.removeDate));
+  });
+  if (scope === "encounter") {
+    const hint = $("#extraDatesHint");
+    if (hint) {
+      hint.textContent = list.length
+        ? `Verranno creati ${list.length + 1} incontri (uno per ogni data).`
+        : "";
+    }
+  }
+}
+
+function wireLightbox() {
+  const overlay = $("#photoLightbox");
+  const img = $("#lightboxImage");
+  if (!overlay || !img) return;
+
+  $("#lightboxClose").addEventListener("click", closeLightbox);
+  overlay.addEventListener("click", (event) => {
+    if (event.target === overlay) closeLightbox();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !overlay.classList.contains("hidden")) closeLightbox();
+  });
+
+  document.addEventListener("click", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLImageElement)) return;
+    if (!target.matches("img.avatar") || !target.src) return;
+    // Avoid triggering the partner-card edit chip if the click bubbles.
+    event.stopPropagation();
+    openLightbox(target.src);
+  });
+}
+
+function openLightbox(src) {
+  const overlay = $("#photoLightbox");
+  const img = $("#lightboxImage");
+  if (!overlay || !img) return;
+  img.src = src;
+  overlay.classList.remove("hidden");
+  overlay.setAttribute("aria-hidden", "false");
+}
+
+function closeLightbox() {
+  const overlay = $("#photoLightbox");
+  const img = $("#lightboxImage");
+  if (!overlay) return;
+  overlay.classList.add("hidden");
+  overlay.setAttribute("aria-hidden", "true");
+  if (img) img.src = "";
 }
 
 function goToStep(step) {
@@ -1030,6 +1157,11 @@ function openEncounterDialog(id = "", date = "") {
   updateStarRating();
   updateNewPartnerHint();
   goToStep(1);
+  extraEncounterDates = [];
+  $("#encounterExtraDatePicker")?.classList.add("hidden");
+  const extraInput = $("#encounterExtraDateInput");
+  if (extraInput) extraInput.value = "";
+  renderExtraDates("encounter");
   $("#deleteEntryButton").classList.toggle("hidden", !id);
   $("#entryDialog").showModal();
 }
@@ -1067,6 +1199,11 @@ function openPartnerDialog(id = "") {
   }
 
   renderPhotoPreview();
+  extraPartnerDates = [];
+  $("#partnerExtraDatePicker")?.classList.add("hidden");
+  const partnerExtraInput = $("#partnerExtraDateInput");
+  if (partnerExtraInput) partnerExtraInput.value = "";
+  renderExtraDates("partner");
   $("#deleteEntryButton").classList.toggle("hidden", !id);
   $("#entryDialog").showModal();
 }
@@ -1109,6 +1246,24 @@ function saveEntry(event) {
       metVia: $("#partnerMetVia").value.trim(),
     };
     state.partners = id ? state.partners.map((item) => (item.id === id ? payload : item)) : [payload, ...state.partners];
+
+    syncFirstTimeEncounter(payload);
+
+    for (const extraDate of extraPartnerDates) {
+      state.encounters = [
+        {
+          id: crypto.randomUUID(),
+          date: extraDate,
+          partnerId: payload.id,
+          mood: 0,
+          safe: "",
+          firstTime: false,
+          tags: [],
+          notes: "",
+        },
+        ...state.encounters,
+      ];
+    }
   } else {
     const partnerName = $("#encounterPartnerName").value.trim();
     if (!partnerName) return;
@@ -1141,11 +1296,74 @@ function saveEntry(event) {
     state.encounters = id
       ? state.encounters.map((item) => (item.id === id ? payload : item))
       : [payload, ...state.encounters];
+
+    if (!id) {
+      for (const extraDate of extraEncounterDates) {
+        if (extraDate === payload.date) continue;
+        state.encounters = [
+          {
+            ...payload,
+            id: crypto.randomUUID(),
+            date: extraDate,
+            firstTime: false,
+          },
+          ...state.encounters,
+        ];
+      }
+    }
   }
 
   saveState();
   $("#entryDialog").close();
   render();
+}
+
+// Ensures the partner's "first time" encounter matches partner.firstDate.
+// - No firstDate: nothing happens (existing firstTime encounters are left alone).
+// - Has firstDate + no firstTime encounter for that partner: creates a light one.
+// - Has firstDate + existing firstTime encounter: moves it to the new date.
+// - If an encounter already sits on that date for this partner, just flags it.
+function syncFirstTimeEncounter(partner) {
+  const firstDate = partner.firstDate;
+  if (!firstDate) return;
+
+  const existingFirstIdx = state.encounters.findIndex(
+    (item) => item.partnerId === partner.id && item.firstTime === true,
+  );
+
+  if (existingFirstIdx !== -1) {
+    const existing = state.encounters[existingFirstIdx];
+    if (existing.date !== firstDate) {
+      state.encounters = state.encounters.map((item, idx) =>
+        idx === existingFirstIdx ? { ...item, date: firstDate } : item,
+      );
+    }
+    return;
+  }
+
+  const sameDayIdx = state.encounters.findIndex(
+    (item) => item.partnerId === partner.id && item.date === firstDate,
+  );
+  if (sameDayIdx !== -1) {
+    state.encounters = state.encounters.map((item, idx) =>
+      idx === sameDayIdx ? { ...item, firstTime: true } : item,
+    );
+    return;
+  }
+
+  state.encounters = [
+    {
+      id: crypto.randomUUID(),
+      date: firstDate,
+      partnerId: partner.id,
+      mood: 0,
+      safe: "",
+      firstTime: true,
+      tags: [],
+      notes: "",
+    },
+    ...state.encounters,
+  ];
 }
 
 function deleteCurrentEntry() {
