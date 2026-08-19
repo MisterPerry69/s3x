@@ -107,8 +107,24 @@ function boot() {
   });
 
   document.body.dataset.tab = activeTab;
+  backfillFirstTimeEncounters();
   wireEvents();
   render();
+}
+
+// One-off migration: partners created before the firstDate→encounter feature
+// have a firstDate but no matching encounter. Walk them once and create the
+// missing "prima volta" encounters. Idempotent via a localStorage flag so an
+// encounter the user later deletes won't get resurrected on next boot.
+const FIRST_TIME_BACKFILL_KEY = "luma-migration-firsttime-v1";
+function backfillFirstTimeEncounters() {
+  if (localStorage.getItem(FIRST_TIME_BACKFILL_KEY)) return;
+  const before = state.encounters.length;
+  for (const partner of state.partners) {
+    if (partner.firstDate) syncFirstTimeEncounter(partner);
+  }
+  localStorage.setItem(FIRST_TIME_BACKFILL_KEY, "1");
+  if (state.encounters.length !== before) saveState();
 }
 
 function wireEvents() {
