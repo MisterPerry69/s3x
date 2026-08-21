@@ -765,6 +765,7 @@ function logFilterLabel(filter) {
   if (filter.type === "tag") return `Tag: ${filter.value}`;
   if (filter.type === "safe") return filter.value === "yes" ? "Protetto" : "Non protetto";
   if (filter.type === "first") return "Prima volta";
+  if (filter.type === "metvia") return `Conosciuta su ${filter.value}`;
   return filter.value;
 }
 
@@ -773,6 +774,10 @@ function matchesLogFilter(item) {
   if (logFilter.type === "tag") return (item.tags || []).includes(logFilter.value);
   if (logFilter.type === "safe") return item.safe === logFilter.value;
   if (logFilter.type === "first") return item.firstTime === true;
+  if (logFilter.type === "metvia") {
+    const partner = getPartner(item.partnerId);
+    return partner?.metVia === logFilter.value;
+  }
   return true;
 }
 
@@ -823,42 +828,46 @@ function renderPartners() {
         const count = state.encounters.filter((item) => item.partnerId === partner.id).length;
         const last = sortedEncounters().find((item) => item.partnerId === partner.id);
         const avg = partnerAvgMood(partner.id);
-        const metaRows = [
-          partner.firstDate
-            ? `<div class="meta-row"><span class="meta-label">Prima volta</span><span class="meta-value">${fullDateLong(partner.firstDate)}</span></div>`
-            : "",
-          partner.metVia
-            ? `<div class="meta-row"><span class="meta-label">Conosciuta su</span><span class="meta-value">${escapeHtml(partner.metVia)}</span></div>`
-            : "",
-        ].filter(Boolean).join("");
         const tagsRow = partner.tags?.length
           ? `<div class="tag-row tag-row-hashtags">${tagsHtml(partner.tags, "partner")}</div>`
           : "";
+        const showDivider = partner.notes || partner.tags?.length;
         return `
-          <article class="partner-card">
-            <button class="edit-chip" data-edit-partner="${partner.id}" type="button" aria-label="Modifica partner">
-              ${icons.pencil}
-            </button>
-            <div class="partner-row">
+          <article class="partner-card" data-partner-id="${partner.id}">
+            <div class="partner-head">
               ${avatarHtml(partner)}
-              <div class="partner-name-block">
-                <strong class="private-text">${escapeHtml(partner.alias || partner.name)}</strong>
-                ${avg !== null ? `<div class="partner-stars">${renderStarsReadonly(avg)}</div>` : ""}
+              <div class="partner-head-main">
+                <strong class="partner-name private-text">${escapeHtml(partner.alias || partner.name)}</strong>
                 ${revisitBadge(partner)}
               </div>
+              ${avg !== null
+                ? `<span class="partner-avg-badge">${avg.toFixed(1).replace(".", ",")}<span class="avg-star">★</span></span>`
+                : ""}
             </div>
             <div class="partner-stats">
               <div class="stat-block">
+                <span class="stat-label">Prima volta</span>
+                <span class="stat-value">${partner.firstDate ? fullDateLong(partner.firstDate) : "-"}</span>
+              </div>
+              <div class="stat-block stat-center">
                 <span class="stat-label">Incontri</span>
                 <strong class="stat-number">${count}</strong>
               </div>
               <div class="stat-block">
-                <span class="stat-label">Ultimo</span>
-                <strong class="stat-value">${last ? fullDateLong(last.date) : "-"}</strong>
+                <span class="stat-label">Ultima volta</span>
+                <span class="stat-value">${last ? fullDateLong(last.date) : "-"}</span>
               </div>
             </div>
-            ${metaRows ? `<div class="partner-meta-list">${metaRows}</div>` : ""}
-            ${partner.notes ? `<p class="private-text partner-notes">${escapeHtml(partner.notes)}</p>` : ""}
+            ${partner.metVia
+              ? `<div class="partner-metvia">
+                   <button type="button" class="pill-metvia" data-tag="${escapeHtml(partner.metVia)}" data-tag-kind="encounter" data-filter-type="metvia">
+                     <span class="pill-label">Conosciuta su</span>
+                     <span class="pill-value">${escapeHtml(partner.metVia)}</span>
+                   </button>
+                 </div>`
+              : ""}
+            ${showDivider ? `<div class="partner-divider"></div>` : ""}
+            ${partner.notes ? `<p class="partner-notes private-text">${escapeHtml(partner.notes)}</p>` : ""}
             ${tagsRow}
           </article>
         `;
@@ -872,8 +881,8 @@ function renderPartners() {
     partnerTagFilter = "";
     renderPartners();
   });
-  $$("[data-edit-partner]", $("#partnerList")).forEach((button) => {
-    button.addEventListener("click", () => openPartnerDialog(button.dataset.editPartner));
+  $$(".partner-card[data-partner-id]", $("#partnerList")).forEach((card) => {
+    addLongPress(card, () => openPartnerDialog(card.dataset.partnerId));
   });
   bindTagFilters($("#partnerList"));
 }
@@ -944,10 +953,51 @@ function formatSafetyPill(item) {
 }
 
 function bindEventCards(root = document) {
-  $$("[data-edit-encounter]", root).forEach((button) => {
-    button.addEventListener("click", () => openEncounterDialog(button.dataset.editEncounter));
+  $$(".event-card[data-encounter-id]", root).forEach((card) => {
+    addLongPress(card, () => openEncounterDialog(card.dataset.encounterId));
   });
   bindTagFilters(root);
+}
+
+function addLongPress(el, onLongPress, duration = 500) {
+  let timer = null;
+  let startX = 0;
+  let startY = 0;
+  const cancel = () => {
+    if (timer) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    el.classList.remove("long-pressing");
+  };
+  const getPoint = (event) => event.touches?.[0] || event;
+  const start = (event) => {
+    if (event.target.closest("button, a, input, textarea, select, label")) return;
+    cancel();
+    const p = getPoint(event);
+    startX = p.clientX;
+    startY = p.clientY;
+    el.classList.add("long-pressing");
+    timer = setTimeout(() => {
+      timer = null;
+      el.classList.remove("long-pressing");
+      if (navigator.vibrate) navigator.vibrate(15);
+      onLongPress();
+    }, duration);
+  };
+  const move = (event) => {
+    if (!timer) return;
+    const p = getPoint(event);
+    if (Math.abs(p.clientX - startX) > 10 || Math.abs(p.clientY - startY) > 10) cancel();
+  };
+  el.addEventListener("mousedown", start);
+  el.addEventListener("touchstart", start, { passive: true });
+  el.addEventListener("mouseup", cancel);
+  el.addEventListener("mouseleave", cancel);
+  el.addEventListener("touchend", cancel);
+  el.addEventListener("touchcancel", cancel);
+  el.addEventListener("mousemove", move);
+  el.addEventListener("touchmove", move, { passive: true });
 }
 
 function eventCard(item) {
@@ -960,18 +1010,17 @@ function eventCard(item) {
       ? `<button type="button" class="pill pill-tag first-time" data-tag="first" data-tag-kind="encounter" data-filter-type="first">Prima volta</button>`
       : "",
     formatSafetyPill(item),
-    metVia ? `<span class="pill pill-soft">Conosciuta su ${escapeHtml(metVia)}</span>` : "",
+    metVia
+      ? `<button type="button" class="pill pill-tag pill-soft" data-tag="${escapeHtml(metVia)}" data-tag-kind="encounter" data-filter-type="metvia">Conosciuta su ${escapeHtml(metVia)}</button>`
+      : "",
   ]
     .filter(Boolean)
     .join("");
   const tags = tagsHtml(item.tags, "encounter");
   return `
-    <article class="event-card">
-      <button class="edit-chip" data-edit-encounter="${item.id}" type="button" aria-label="Modifica incontro">
-        ${icons.pencil}
-      </button>
+    <article class="event-card" data-encounter-id="${item.id}">
       <div class="event-top">
-        <span class="event-date meta">${shortDate(item.date)}</span>
+        <span class="event-date meta">${fullDate(item.date)}</span>
         <strong class="event-name private-text">${escapeHtml(partnerDisplay(partner))}</strong>
         <span class="event-mood">${mood > 0 ? renderStarsInline(mood) : ""}</span>
       </div>
