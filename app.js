@@ -846,12 +846,12 @@ function renderPartners() {
             </div>
             <div class="partner-stats">
               <div class="stat-block">
-                <span class="stat-label">Prima volta</span>
-                <span class="stat-value">${partner.firstDate ? fullDateLong(partner.firstDate) : "-"}</span>
-              </div>
-              <div class="stat-block stat-center">
                 <span class="stat-label">Incontri</span>
                 <strong class="stat-number">${count}</strong>
+              </div>
+              <div class="stat-block stat-center">
+                <span class="stat-label">Prima volta</span>
+                <span class="stat-value">${partner.firstDate ? fullDateLong(partner.firstDate) : "-"}</span>
               </div>
               <div class="stat-block">
                 <span class="stat-label">Ultima volta</span>
@@ -866,7 +866,6 @@ function renderPartners() {
                    </button>
                  </div>`
               : ""}
-            ${showDivider ? `<div class="partner-divider"></div>` : ""}
             ${partner.notes ? `<p class="partner-notes private-text">${escapeHtml(partner.notes)}</p>` : ""}
             ${tagsRow}
           </article>
