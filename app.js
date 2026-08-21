@@ -95,8 +95,10 @@ let partnerTagFilter = "";
 let logFilter = null; // { type: "tag" | "safe" | "first", value }
 let wizardStep = 1;
 const WIZARD_STEPS = 3;
-let extraEncounterDates = [];
-let extraPartnerDates = [];
+let extraEncounterDates = []; // [{ date, mood, safe, notes }]
+let extraPartnerDates = [];   // [{ date, mood, safe, notes }]
+let partnerFirstMood = 0;
+let partnerFirstSafe = "";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -189,63 +191,86 @@ function wireEvents() {
   $("#wizardPrev")?.addEventListener("click", prevStep);
   $("#wizardNext")?.addEventListener("click", nextStep);
 
-  wireExtraDateControls({
-    scope: "encounter",
-    addBtn: "#addEncounterExtraDateButton",
-    picker: "#encounterExtraDatePicker",
-    input: "#encounterExtraDateInput",
-    confirm: "#confirmEncounterExtraDateButton",
-    cancel: "#cancelEncounterExtraDateButton",
-  });
-  wireExtraDateControls({
-    scope: "partner",
-    addBtn: "#addPartnerExtraDateButton",
-    picker: "#partnerExtraDatePicker",
-    input: "#partnerExtraDateInput",
-    confirm: "#confirmPartnerExtraDateButton",
-    cancel: "#cancelPartnerExtraDateButton",
-  });
+  $("#addEncounterExtraDateButton")?.addEventListener("click", () => addExtraDate("encounter"));
+  $("#addPartnerExtraDateButton")?.addEventListener("click", () => addExtraDate("partner"));
+
+  $("#partnerFirstDate")?.addEventListener("input", updateFirstTimeControlsVisibility);
 
   wireLightbox();
 
   buildStarRating();
 }
 
-function wireExtraDateControls({ scope, addBtn, picker, input, confirm, cancel }) {
-  const pickerEl = $(picker);
-  const inputEl = $(input);
-  $(addBtn)?.addEventListener("click", () => {
-    pickerEl.classList.remove("hidden");
-    if (!inputEl.value) inputEl.value = toInputDate(new Date());
-    inputEl.focus();
+function updateFirstTimeControlsVisibility() {
+  const has = !!$("#partnerFirstDate")?.value;
+  $("#firstTimeControls")?.classList.toggle("hidden", !has);
+}
+
+function renderFirstTimeControls() {
+  const starContainer = $("#firstTimeStars");
+  const safeContainer = $("#firstTimeSafe");
+  if (!starContainer || !safeContainer) return;
+  makeQuickStars(starContainer, partnerFirstMood, (value) => {
+    partnerFirstMood = value;
   });
-  $(cancel)?.addEventListener("click", () => {
-    pickerEl.classList.add("hidden");
-    inputEl.value = "";
+  makeSafeToggle(safeContainer, partnerFirstSafe, (value) => {
+    partnerFirstSafe = value;
   });
-  $(confirm)?.addEventListener("click", () => {
-    const value = inputEl.value;
-    if (!value) return;
-    addExtraDate(scope, value);
-    pickerEl.classList.add("hidden");
-    inputEl.value = "";
+  updateFirstTimeControlsVisibility();
+}
+
+function makeQuickStars(container, initial, onChange) {
+  let value = Number(initial) || 0;
+  container.innerHTML = Array.from({ length: 5 }, (_, i) => {
+    const n = i + 1;
+    const active = n <= value ? "active" : "";
+    return `<button type="button" class="${active}" data-star="${n}" aria-label="Voto ${n}">★</button>`;
+  }).join("");
+  container.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      const n = Number(btn.dataset.star);
+      value = value === n ? n - 1 : n;
+      container.querySelectorAll("button").forEach((b) => {
+        b.classList.toggle("active", Number(b.dataset.star) <= value);
+      });
+      onChange(value);
+    });
   });
 }
 
-function addExtraDate(scope, value) {
+function makeSafeToggle(container, initial, onChange) {
+  let value = initial || "";
+  container.innerHTML = `
+    <button type="button" data-safe="yes"><span class="safe-glyph">🛡️</span>Protetto</button>
+    <button type="button" data-safe="no"><span class="safe-glyph">⚠️</span>Non protetto</button>
+  `;
+  const paint = () => {
+    container.querySelectorAll("button").forEach((b) => {
+      b.classList.toggle("active", b.dataset.safe === value);
+    });
+  };
+  paint();
+  container.querySelectorAll("button").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      const next = btn.dataset.safe;
+      value = value === next ? "" : next;
+      paint();
+      onChange(value);
+    });
+  });
+}
+
+function addExtraDate(scope) {
   const list = scope === "partner" ? extraPartnerDates : extraEncounterDates;
-  if (list.includes(value)) return;
-  list.push(value);
-  list.sort();
+  list.push({ date: toInputDate(new Date()), mood: 0, safe: "", notes: "" });
   renderExtraDates(scope);
 }
 
-function removeExtraDate(scope, value) {
-  if (scope === "partner") {
-    extraPartnerDates = extraPartnerDates.filter((d) => d !== value);
-  } else {
-    extraEncounterDates = extraEncounterDates.filter((d) => d !== value);
-  }
+function removeExtraDate(scope, idx) {
+  if (scope === "partner") extraPartnerDates.splice(idx, 1);
+  else extraEncounterDates.splice(idx, 1);
   renderExtraDates(scope);
 }
 
@@ -255,17 +280,46 @@ function renderExtraDates(scope) {
   if (!container) return;
   container.innerHTML = list
     .map(
-      (date) => `
-        <span class="date-chip">
-          ${escapeHtml(shortDate(date))}
-          <button type="button" data-remove-date="${date}" aria-label="Rimuovi">✕</button>
-        </span>
+      (_, idx) => `
+        <div class="extra-date-card" data-idx="${idx}">
+          <button type="button" class="extra-remove" data-remove="${idx}" aria-label="Rimuovi">✕</button>
+          <input type="date" data-field="date" data-idx="${idx}" />
+          <div class="quick-stars" data-role="stars" data-idx="${idx}"></div>
+          <div class="safe-toggle" data-role="safe" data-idx="${idx}"></div>
+          <input type="text" data-field="notes" data-idx="${idx}" placeholder="Commento (opzionale)" />
+        </div>
       `,
     )
     .join("");
-  $$("[data-remove-date]", container).forEach((btn) => {
-    btn.addEventListener("click", () => removeExtraDate(scope, btn.dataset.removeDate));
+
+  list.forEach((entry, idx) => {
+    const dateInput = container.querySelector(`input[data-field="date"][data-idx="${idx}"]`);
+    if (dateInput) {
+      dateInput.value = entry.date || "";
+      dateInput.addEventListener("input", () => {
+        entry.date = dateInput.value;
+      });
+    }
+    const notesInput = container.querySelector(`input[data-field="notes"][data-idx="${idx}"]`);
+    if (notesInput) {
+      notesInput.value = entry.notes || "";
+      notesInput.addEventListener("input", () => {
+        entry.notes = notesInput.value;
+      });
+    }
+    const starsEl = container.querySelector(`[data-role="stars"][data-idx="${idx}"]`);
+    if (starsEl) makeQuickStars(starsEl, entry.mood || 0, (v) => (entry.mood = v));
+    const safeEl = container.querySelector(`[data-role="safe"][data-idx="${idx}"]`);
+    if (safeEl) makeSafeToggle(safeEl, entry.safe || "", (v) => (entry.safe = v));
   });
+
+  container.querySelectorAll("[data-remove]").forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.preventDefault();
+      removeExtraDate(scope, Number(btn.dataset.remove));
+    });
+  });
+
   if (scope === "encounter") {
     const hint = $("#extraDatesHint");
     if (hint) {
@@ -417,8 +471,9 @@ function renderDashboard() {
   const safeRate = safeItems.length
     ? Math.round((safeItems.filter((item) => item.safe === "yes").length / safeItems.length) * 100)
     : 0;
-  const moodAverage = state.encounters.length
-    ? (state.encounters.reduce((sum, item) => sum + Number(item.mood || 0), 0) / state.encounters.length).toFixed(1)
+  const ratedItems = state.encounters.filter((item) => Number(item.mood || 0) > 0);
+  const moodAverage = ratedItems.length
+    ? (ratedItems.reduce((sum, item) => sum + Number(item.mood), 0) / ratedItems.length).toFixed(1)
     : "-";
   const sorted = sortedEncounters();
   const lastEncounter = sorted[0];
@@ -768,6 +823,17 @@ function renderPartners() {
         const count = state.encounters.filter((item) => item.partnerId === partner.id).length;
         const last = sortedEncounters().find((item) => item.partnerId === partner.id);
         const avg = partnerAvgMood(partner.id);
+        const metaRows = [
+          partner.firstDate
+            ? `<div class="meta-row"><span class="meta-label">Prima volta</span><span class="meta-value">${fullDateLong(partner.firstDate)}</span></div>`
+            : "",
+          partner.metVia
+            ? `<div class="meta-row"><span class="meta-label">Conosciuta su</span><span class="meta-value">${escapeHtml(partner.metVia)}</span></div>`
+            : "",
+        ].filter(Boolean).join("");
+        const tagsRow = partner.tags?.length
+          ? `<div class="tag-row tag-row-hashtags">${tagsHtml(partner.tags, "partner")}</div>`
+          : "";
         return `
           <article class="partner-card">
             <button class="edit-chip" data-edit-partner="${partner.id}" type="button" aria-label="Modifica partner">
@@ -781,11 +847,19 @@ function renderPartners() {
                 ${revisitBadge(partner)}
               </div>
             </div>
-            <p class="meta">${count} incontri${last ? `, ultimo ${shortDate(last.date)}` : ""}</p>
-            ${partner.firstDate ? `<p class="meta">Prima volta: ${fullDate(partner.firstDate)}</p>` : ""}
-            ${partner.metVia ? `<p class="meta">Conosciuta su: ${escapeHtml(partner.metVia)}</p>` : ""}
-            <div class="tag-row">${tagsHtml(partner.tags, "partner")}</div>
-            ${partner.notes ? `<p class="private-text">${escapeHtml(partner.notes)}</p>` : ""}
+            <div class="partner-stats">
+              <div class="stat-block">
+                <span class="stat-label">Incontri</span>
+                <strong class="stat-number">${count}</strong>
+              </div>
+              <div class="stat-block">
+                <span class="stat-label">Ultimo</span>
+                <strong class="stat-value">${last ? fullDateLong(last.date) : "-"}</strong>
+              </div>
+            </div>
+            ${metaRows ? `<div class="partner-meta-list">${metaRows}</div>` : ""}
+            ${partner.notes ? `<p class="private-text partner-notes">${escapeHtml(partner.notes)}</p>` : ""}
+            ${tagsRow}
           </article>
         `;
       })
@@ -863,8 +937,9 @@ function renderPartnerOptions() {
 }
 
 function formatSafetyPill(item) {
+  if (item.safe !== "yes" && item.safe !== "no") return "";
   const safeText = item.safe === "yes" ? "Protetto" : "Non protetto";
-  const safeClass = item.safe === "yes" ? "safe" : item.safe === "no" ? "risk" : "";
+  const safeClass = item.safe === "yes" ? "safe" : "risk";
   return `<button type="button" class="pill pill-tag ${safeClass}" data-tag="${item.safe}" data-tag-kind="encounter" data-filter-type="safe">${safeText}</button>`;
 }
 
@@ -879,6 +954,7 @@ function eventCard(item) {
   const partner = getPartner(item.partnerId);
   const isFirst = isFirstEncounter(item);
   const metVia = partner?.metVia;
+  const mood = Number(item.mood || 0);
   const statusRow = [
     isFirst
       ? `<button type="button" class="pill pill-tag first-time" data-tag="first" data-tag-kind="encounter" data-filter-type="first">Prima volta</button>`
@@ -897,11 +973,11 @@ function eventCard(item) {
       <div class="event-top">
         <span class="event-date meta">${shortDate(item.date)}</span>
         <strong class="event-name private-text">${escapeHtml(partnerDisplay(partner))}</strong>
-        <span class="event-mood">${renderStarsInline(Number(item.mood || 0))}</span>
+        <span class="event-mood">${mood > 0 ? renderStarsInline(mood) : ""}</span>
       </div>
       ${statusRow ? `<div class="tag-row status-row">${statusRow}</div>` : ""}
-      ${tags ? `<div class="tag-row">${tags}</div>` : ""}
       ${item.notes ? `<p class="private-text event-notes">${escapeHtml(item.notes)}</p>` : ""}
+      ${tags ? `<div class="tag-row tag-row-hashtags">${tags}</div>` : ""}
     </article>
   `;
 }
@@ -1174,9 +1250,6 @@ function openEncounterDialog(id = "", date = "") {
   updateNewPartnerHint();
   goToStep(1);
   extraEncounterDates = [];
-  $("#encounterExtraDatePicker")?.classList.add("hidden");
-  const extraInput = $("#encounterExtraDateInput");
-  if (extraInput) extraInput.value = "";
   renderExtraDates("encounter");
   $("#deleteEntryButton").classList.toggle("hidden", !id);
   $("#entryDialog").showModal();
@@ -1216,10 +1289,16 @@ function openPartnerDialog(id = "") {
 
   renderPhotoPreview();
   extraPartnerDates = [];
-  $("#partnerExtraDatePicker")?.classList.add("hidden");
-  const partnerExtraInput = $("#partnerExtraDateInput");
-  if (partnerExtraInput) partnerExtraInput.value = "";
   renderExtraDates("partner");
+
+  // Preload first-time controls from an existing "prima volta" encounter, if any
+  const existingFirst = id
+    ? state.encounters.find((item) => item.partnerId === id && item.firstTime === true)
+    : null;
+  partnerFirstMood = Number(existingFirst?.mood) || 0;
+  partnerFirstSafe = existingFirst?.safe === "yes" || existingFirst?.safe === "no" ? existingFirst.safe : "";
+  renderFirstTimeControls();
+
   $("#deleteEntryButton").classList.toggle("hidden", !id);
   $("#entryDialog").showModal();
 }
@@ -1263,19 +1342,25 @@ function saveEntry(event) {
     };
     state.partners = id ? state.partners.map((item) => (item.id === id ? payload : item)) : [payload, ...state.partners];
 
-    syncFirstTimeEncounter(payload);
+    syncFirstTimeEncounter(payload, {
+      mood: partnerFirstMood,
+      safe: partnerFirstSafe,
+      tags: payload.tags,
+      notes: payload.notes,
+    });
 
-    for (const extraDate of extraPartnerDates) {
+    for (const extra of extraPartnerDates) {
+      if (!extra.date) continue;
       state.encounters = [
         {
           id: crypto.randomUUID(),
-          date: extraDate,
+          date: extra.date,
           partnerId: payload.id,
-          mood: 0,
-          safe: "",
+          mood: Number(extra.mood) || 0,
+          safe: extra.safe || "",
           firstTime: false,
-          tags: [],
-          notes: "",
+          tags: payload.tags,
+          notes: extra.notes || "",
         },
         ...state.encounters,
       ];
@@ -1314,14 +1399,17 @@ function saveEntry(event) {
       : [payload, ...state.encounters];
 
     if (!id) {
-      for (const extraDate of extraEncounterDates) {
-        if (extraDate === payload.date) continue;
+      for (const extra of extraEncounterDates) {
+        if (!extra.date || extra.date === payload.date) continue;
         state.encounters = [
           {
             ...payload,
             id: crypto.randomUUID(),
-            date: extraDate,
+            date: extra.date,
+            mood: Number(extra.mood) || 0,
+            safe: extra.safe || "",
             firstTime: false,
+            notes: extra.notes || "",
           },
           ...state.encounters,
         ];
@@ -1339,21 +1427,31 @@ function saveEntry(event) {
 // - Has firstDate + no firstTime encounter for that partner: creates a light one.
 // - Has firstDate + existing firstTime encounter: moves it to the new date.
 // - If an encounter already sits on that date for this partner, just flags it.
-function syncFirstTimeEncounter(partner) {
+function syncFirstTimeEncounter(partner, override = null) {
   const firstDate = partner.firstDate;
   if (!firstDate) return;
+
+  // Fields we may push into the first-time encounter. Null override (backfill) → don't overwrite existing values.
+  const applyOverride = (existing) => {
+    if (!override) return existing;
+    return {
+      ...existing,
+      date: firstDate,
+      mood: override.mood != null ? Number(override.mood) || 0 : existing.mood,
+      safe: override.safe != null ? override.safe : existing.safe,
+      tags: override.tags != null ? override.tags : existing.tags,
+      notes: override.notes != null ? override.notes : existing.notes,
+    };
+  };
 
   const existingFirstIdx = state.encounters.findIndex(
     (item) => item.partnerId === partner.id && item.firstTime === true,
   );
 
   if (existingFirstIdx !== -1) {
-    const existing = state.encounters[existingFirstIdx];
-    if (existing.date !== firstDate) {
-      state.encounters = state.encounters.map((item, idx) =>
-        idx === existingFirstIdx ? { ...item, date: firstDate } : item,
-      );
-    }
+    state.encounters = state.encounters.map((item, idx) =>
+      idx === existingFirstIdx ? applyOverride({ ...item, date: firstDate }) : item,
+    );
     return;
   }
 
@@ -1362,7 +1460,7 @@ function syncFirstTimeEncounter(partner) {
   );
   if (sameDayIdx !== -1) {
     state.encounters = state.encounters.map((item, idx) =>
-      idx === sameDayIdx ? { ...item, firstTime: true } : item,
+      idx === sameDayIdx ? applyOverride({ ...item, firstTime: true }) : item,
     );
     return;
   }
@@ -1372,11 +1470,11 @@ function syncFirstTimeEncounter(partner) {
       id: crypto.randomUUID(),
       date: firstDate,
       partnerId: partner.id,
-      mood: 0,
-      safe: "",
+      mood: override ? Number(override.mood) || 0 : 0,
+      safe: override ? override.safe || "" : "",
       firstTime: true,
-      tags: [],
-      notes: "",
+      tags: override ? override.tags || [] : [],
+      notes: override ? override.notes || "" : "",
     },
     ...state.encounters,
   ];
@@ -1491,6 +1589,10 @@ function shortDate(value) {
 
 function fullDate(value) {
   return parseDate(value).toLocaleDateString("it-IT", { day: "2-digit", month: "short", year: "numeric" });
+}
+
+function fullDateLong(value) {
+  return parseDate(value).toLocaleDateString("it-IT", { day: "numeric", month: "long", year: "numeric" });
 }
 
 function timeAgo(value) {

@@ -498,6 +498,118 @@ p {
   color: var(--plum-soft);
 }
 
+.tag-row-hashtags {
+  padding-right: 42px;
+  gap: 6px;
+}
+
+.tag-row-hashtags .pill-tag {
+  padding: 4px 10px;
+  font-size: 0.75rem;
+  background: rgba(120, 86, 104, 0.06);
+  color: var(--plum-soft);
+  border-radius: 999px;
+}
+
+.tag-row-hashtags .pill-tag::before {
+  content: "#";
+  opacity: 0.55;
+  margin-right: 1px;
+}
+
+.tag-row-hashtags .pill-tag:hover {
+  background: var(--peach-soft);
+  color: var(--peach-deep);
+}
+
+/* ─── PARTNER CARD STRUCTURE ─── */
+
+.partner-stats {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 14px;
+  border-radius: var(--radius-xs);
+  background: var(--card-soft);
+  border: 1px solid var(--line);
+}
+
+.partner-stats .stat-block {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.partner-stats .stat-block + .stat-block {
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+
+.partner-stats .stat-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--plum-soft);
+}
+
+.partner-stats .stat-number {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--peach-deep);
+  line-height: 1;
+}
+
+.partner-stats .stat-value {
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: var(--plum);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.partner-meta-list {
+  display: grid;
+  gap: 6px;
+}
+
+.partner-meta-list .meta-row {
+  display: grid;
+  grid-template-columns: minmax(120px, auto) 1fr;
+  align-items: baseline;
+  gap: 10px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--line);
+}
+
+.partner-meta-list .meta-row:last-child {
+  border-bottom: 0;
+}
+
+.partner-meta-list .meta-label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--plum-soft);
+}
+
+.partner-meta-list .meta-value {
+  font-size: 0.94rem;
+  font-weight: 600;
+  color: var(--plum);
+}
+
+.partner-notes {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.45;
+  color: var(--plum-soft);
+}
+
 .pill-soft {
   background: var(--card-soft);
   color: var(--plum-soft);
@@ -1481,60 +1593,147 @@ label {
   color: var(--plum);
 }
 
-.multi-date-picker {
+.extra-date-list {
   display: flex;
-  gap: 8px;
-  align-items: center;
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.multi-date-picker input[type="date"] {
-  flex: 1 1 140px;
+.extra-date-list:empty {
+  display: none;
+}
+
+.extra-date-card {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 12px 12px 12px 12px;
+  padding-right: 36px;
+  border-radius: var(--radius-xs);
+  background: #fff;
+  border: 1px solid var(--line);
+}
+
+.extra-date-card input[type="date"],
+.extra-date-card input[type="text"] {
+  width: 100%;
   padding: 8px 10px;
   border-radius: var(--radius-xs);
   border: 1px solid var(--line-strong);
   background: #fff;
+  font-size: 0.88rem;
 }
 
-.chip-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+.extra-date-card .quick-stars {
+  padding: 0;
 }
 
-.chip-row:empty {
-  display: none;
-}
-
-.date-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  border-radius: 999px;
-  background: var(--peach-soft);
-  color: var(--plum);
-  font-size: 0.82rem;
-  font-weight: 600;
-  border: none;
-}
-
-.date-chip button {
+.extra-remove {
+  position: absolute;
+  top: 8px;
+  right: 8px;
   display: grid;
   place-items: center;
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   padding: 0;
   border-radius: 50%;
   border: none;
-  background: rgba(70, 48, 66, 0.15);
+  background: rgba(70, 48, 66, 0.1);
   color: var(--plum);
-  font-size: 0.75rem;
+  font-size: 0.78rem;
+}
+
+.extra-remove:hover {
+  background: var(--cherry-soft);
+  color: var(--cherry);
+}
+
+/* ─── FIRST TIME MINI CONTROLS ─── */
+
+.first-time-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.first-time-controls {
+  display: grid;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: var(--radius-xs);
+  background: var(--peach-soft);
+  border: 1px solid var(--line);
+}
+
+/* ─── QUICK STARS (compact rating used in first-time and extra-date cards) ─── */
+
+.quick-stars {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+}
+
+.quick-stars button {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--plum-faint);
+  font-size: 1.35rem;
+  line-height: 1;
+  transition: transform 0.12s, color 0.12s;
+}
+
+.quick-stars button.active {
+  color: var(--peach-deep);
+}
+
+.quick-stars button:hover {
+  transform: scale(1.12);
+}
+
+/* ─── SAFE TOGGLE (compact) ─── */
+
+.safe-toggle {
+  display: inline-flex;
+  gap: 6px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(70, 48, 66, 0.05);
+  width: fit-content;
+}
+
+.safe-toggle button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--plum-soft);
+  font-size: 0.8rem;
+  font-weight: 600;
+  transition: background 0.15s, color 0.15s;
+}
+
+.safe-toggle button .safe-glyph {
+  font-size: 0.95rem;
   line-height: 1;
 }
 
-.date-chip button:hover {
-  background: rgba(70, 48, 66, 0.3);
+.safe-toggle button.active[data-safe="yes"] {
+  background: var(--sage);
+  color: #fff;
+}
+
+.safe-toggle button.active[data-safe="no"] {
+  background: var(--cherry);
+  color: #fff;
 }
 
 .ghost-button.small,

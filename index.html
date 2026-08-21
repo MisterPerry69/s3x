@@ -239,11 +239,17 @@
             Nome
             <input id="partnerName" type="text" autocomplete="off" />
           </label>
-          <label>
-            Prima volta
-            <input id="partnerFirstDate" type="date" />
-            <span class="helper-text">Verrà creato un incontro in quella data (se non esiste già).</span>
-          </label>
+          <div class="first-time-block">
+            <label>
+              Prima volta
+              <input id="partnerFirstDate" type="date" />
+            </label>
+            <div class="first-time-controls hidden" id="firstTimeControls">
+              <div class="quick-stars" id="firstTimeStars" role="group" aria-label="Voto prima volta"></div>
+              <div class="safe-toggle" id="firstTimeSafe" role="group" aria-label="Protezione prima volta"></div>
+              <p class="helper-text">Note e tag di questo profilo saranno usate come commento della prima volta.</p>
+            </div>
+          </div>
           <div class="multi-date-block">
             <div class="multi-date-header">
               <span>Altri incontri</span>
@@ -251,12 +257,7 @@
                 <span data-icon="plus"></span> Aggiungi data
               </button>
             </div>
-            <div class="multi-date-picker hidden" id="partnerExtraDatePicker">
-              <input id="partnerExtraDateInput" type="date" />
-              <button class="primary-button small" id="confirmPartnerExtraDateButton" type="button">OK</button>
-              <button class="ghost-button small" id="cancelPartnerExtraDateButton" type="button">Annulla</button>
-            </div>
-            <div class="chip-row date-chip-row" id="partnerExtraDatesList"></div>
+            <div class="extra-date-list" id="partnerExtraDatesList"></div>
           </div>
           <label>
             Conosciuta su
@@ -308,12 +309,7 @@
                   <span data-icon="plus"></span> Aggiungi data
                 </button>
               </div>
-              <div class="multi-date-picker hidden" id="encounterExtraDatePicker">
-                <input id="encounterExtraDateInput" type="date" />
-                <button class="primary-button small" id="confirmEncounterExtraDateButton" type="button">OK</button>
-                <button class="ghost-button small" id="cancelEncounterExtraDateButton" type="button">Annulla</button>
-              </div>
-              <div class="chip-row date-chip-row" id="encounterExtraDatesList"></div>
+              <div class="extra-date-list" id="encounterExtraDatesList"></div>
               <span class="helper-text" id="extraDatesHint"></span>
             </div>
           </div>
