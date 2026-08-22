@@ -101,6 +101,21 @@
               Nuovo
             </button>
           </div>
+          <div class="filter-row">
+            <select id="partnerSortSelect">
+              <option value="first-desc">Prima volta (più recente)</option>
+              <option value="first-asc">Prima volta (meno recente)</option>
+              <option value="last-desc">Ultimo incontro</option>
+              <option value="encounters-desc">Più incontri</option>
+              <option value="name-asc">Nome (A→Z)</option>
+            </select>
+            <select id="partnerRevisitFilter">
+              <option value="">Tutti</option>
+              <option value="yes">Da rivedere</option>
+              <option value="maybe">Forse</option>
+              <option value="no">No, mai più</option>
+            </select>
+          </div>
           <div class="partner-grid" id="partnerList"></div>
         </section>
 
@@ -275,7 +290,10 @@
           </label>
           <label>
             Vibe / tag
-            <input id="partnerTags" type="text" placeholder="dolce, casual, ex..." autocomplete="off" />
+            <div class="tag-input-wrap">
+              <input id="partnerTags" type="text" placeholder="dolce, casual, ex..." autocomplete="off" />
+              <div class="tag-suggestions hidden" id="partnerTagsSuggestions" role="listbox"></div>
+            </div>
           </label>
           <label>
             Note
@@ -342,7 +360,10 @@
             <p class="wizard-step-title">Dettagli</p>
             <label>
               Tag
-              <input id="encounterTags" type="text" placeholder="romantico, aftercare, quick..." autocomplete="off" />
+              <div class="tag-input-wrap">
+                <input id="encounterTags" type="text" placeholder="romantico, aftercare, quick..." autocomplete="off" />
+                <div class="tag-suggestions hidden" id="encounterTagsSuggestions" role="listbox"></div>
+              </div>
             </label>
             <label>
               Note

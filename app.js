@@ -99,6 +99,8 @@ let extraEncounterDates = []; // [{ date, mood, safe, notes }]
 let extraPartnerDates = [];   // [{ date, mood, safe, notes }]
 let partnerFirstMood = 0;
 let partnerFirstSafe = "";
+let partnerSort = "first-desc";
+let partnerRevisitFilter = "";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -195,6 +197,18 @@ function wireEvents() {
   $("#addPartnerExtraDateButton")?.addEventListener("click", () => addExtraDate("partner"));
 
   $("#partnerFirstDate")?.addEventListener("input", updateFirstTimeControlsVisibility);
+
+  $("#partnerSortSelect")?.addEventListener("change", (event) => {
+    partnerSort = event.target.value;
+    renderPartners();
+  });
+  $("#partnerRevisitFilter")?.addEventListener("change", (event) => {
+    partnerRevisitFilter = event.target.value;
+    renderPartners();
+  });
+
+  attachTagSuggestions($("#partnerTags"), $("#partnerTagsSuggestions"));
+  attachTagSuggestions($("#encounterTags"), $("#encounterTagsSuggestions"));
 
   wireLightbox();
 
@@ -451,6 +465,55 @@ function normalizeRevisit(value) {
   if (value === "yes" || value === "no" || value === "maybe") return value;
   if (value === true) return "yes";
   return "maybe";
+}
+
+function sortPartnersBy(list, key) {
+  const copy = [...list];
+  const lastDateOf = (id) => {
+    let latest = "";
+    for (const enc of state.encounters) {
+      if (enc.partnerId === id && enc.date > latest) latest = enc.date;
+    }
+    return latest;
+  };
+  const countOf = (id) => state.encounters.reduce((n, enc) => n + (enc.partnerId === id ? 1 : 0), 0);
+  const nameOf = (p) => (p.alias || p.name || "").toLowerCase();
+  const cmpMissingLast = (a, b) => (a ? 0 : 1) - (b ? 0 : 1); // empty → end
+
+  switch (key) {
+    case "first-asc":
+      copy.sort((a, b) =>
+        cmpMissingLast(a.firstDate, b.firstDate) || (a.firstDate || "").localeCompare(b.firstDate || ""),
+      );
+      break;
+    case "last-desc":
+      copy.sort((a, b) => {
+        const la = lastDateOf(a.id);
+        const lb = lastDateOf(b.id);
+        return cmpMissingLast(la, lb) || lb.localeCompare(la);
+      });
+      break;
+    case "encounters-desc":
+      copy.sort((a, b) => countOf(b.id) - countOf(a.id));
+      break;
+    case "name-asc":
+      copy.sort((a, b) => nameOf(a).localeCompare(nameOf(b)));
+      break;
+    case "first-desc":
+    default:
+      copy.sort((a, b) =>
+        cmpMissingLast(a.firstDate, b.firstDate) || (b.firstDate || "").localeCompare(a.firstDate || ""),
+      );
+      break;
+  }
+  return copy;
+}
+
+function syncPartnerFilterUI() {
+  const sortEl = $("#partnerSortSelect");
+  const revEl = $("#partnerRevisitFilter");
+  if (sortEl && sortEl.value !== partnerSort) sortEl.value = partnerSort;
+  if (revEl && revEl.value !== partnerRevisitFilter) revEl.value = partnerRevisitFilter;
 }
 
 function render() {
@@ -811,9 +874,17 @@ function renderLists() {
 }
 
 function renderPartners() {
-  const filtered = partnerTagFilter
+  syncPartnerFilterUI();
+
+  let filtered = partnerTagFilter
     ? state.partners.filter((partner) => (partner.tags || []).includes(partnerTagFilter))
-    : state.partners;
+    : state.partners.slice();
+
+  if (partnerRevisitFilter) {
+    filtered = filtered.filter((partner) => normalizeRevisit(partner.revisit) === partnerRevisitFilter);
+  }
+
+  filtered = sortPartnersBy(filtered, partnerSort);
 
   const filterChip = partnerTagFilter
     ? `<div class="active-filter">
@@ -1608,6 +1679,77 @@ function splitTags(value) {
     .map((tag) => tag.trim())
     .filter(Boolean)
     .filter((tag, idx, arr) => arr.indexOf(tag) === idx);
+}
+
+function allKnownTags() {
+  const set = new Set();
+  for (const enc of state.encounters) for (const tag of enc.tags || []) set.add(tag);
+  for (const p of state.partners) for (const tag of p.tags || []) set.add(tag);
+  return [...set].sort((a, b) => a.localeCompare(b));
+}
+
+function attachTagSuggestions(input, dropdown) {
+  if (!input || !dropdown) return;
+  let hideTimer = null;
+
+  const currentToken = () => {
+    const value = input.value;
+    const commaIdx = value.lastIndexOf(",");
+    return {
+      token: value.slice(commaIdx + 1).trim(),
+      prefix: commaIdx === -1 ? "" : value.slice(0, commaIdx + 1),
+    };
+  };
+
+  const alreadyPicked = () => new Set(splitTags(input.value).map((t) => t.toLowerCase()));
+
+  const paint = () => {
+    const { token } = currentToken();
+    const picked = alreadyPicked();
+    const q = token.toLowerCase();
+    const options = allKnownTags().filter((tag) => {
+      const lower = tag.toLowerCase();
+      if (picked.has(lower)) return false;
+      if (!q) return true;
+      return lower.includes(q);
+    });
+    if (!options.length) {
+      dropdown.classList.add("hidden");
+      dropdown.innerHTML = "";
+      return;
+    }
+    dropdown.innerHTML = options
+      .slice(0, 20)
+      .map((tag) => `<button type="button" class="tag-suggestion" data-tag="${escapeHtml(tag)}">${escapeHtml(tag)}</button>`)
+      .join("");
+    dropdown.classList.remove("hidden");
+    dropdown.querySelectorAll(".tag-suggestion").forEach((btn) => {
+      // mousedown fires before blur — apply the tag before the input loses focus
+      btn.addEventListener("mousedown", (event) => {
+        event.preventDefault();
+        pick(btn.dataset.tag);
+      });
+    });
+  };
+
+  const pick = (tag) => {
+    const { prefix } = currentToken();
+    const cleanPrefix = prefix.replace(/[\s,]+$/, "");
+    input.value = (cleanPrefix ? cleanPrefix + ", " : "") + tag + ", ";
+    input.focus();
+    paint();
+  };
+
+  input.addEventListener("focus", paint);
+  input.addEventListener("input", paint);
+  input.addEventListener("blur", () => {
+    hideTimer = setTimeout(() => {
+      dropdown.classList.add("hidden");
+    }, 120);
+  });
+  dropdown.addEventListener("mousedown", () => {
+    if (hideTimer) clearTimeout(hideTimer);
+  });
 }
 
 function parseDate(value) {
