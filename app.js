@@ -594,17 +594,23 @@ function renderStats() {
   $("#statsYear").classList.toggle("hidden", scope !== "year");
   $("#profileSubtitle").textContent = `${items.length} incontri nel periodo selezionato`;
   $("#statsGrid").innerHTML = [
-    statCard("Incontri", items.length),
-    statCard("Partner", partners.size),
-    statCard("Voto medio", moodAverage),
-    statCard("Protetti", `${safeRate}%`),
-    statCard("Prime volte", firstTimes),
-    statCard("Tag diversi", uniqueTags(items).size),
+    statCard("Incontri", items.length, "calendar", "peach"),
+    statCard("Partner", partners.size, "users", "coral"),
+    statCard("Voto medio", moodAverage, "star", "peach"),
+    statCard("Protetti", `${safeRate}%`, "shield", "sage"),
+    statCard("Prime volte", firstTimes, "heart", "coral"),
+    statCard("Tag diversi", uniqueTags(items).size, "note", "peach"),
   ].join("");
 
   renderTopPartners(items);
-  renderMoodChart(items);
-  renderInsights();
+  renderPeriodLog(items);
+}
+
+function renderPeriodLog(items) {
+  const list = $("#periodLog");
+  if (!list) return;
+  list.innerHTML = items.length ? items.map(eventCard).join("") : emptyState("Nessun incontro nel periodo.");
+  bindEventCards(list);
 }
 
 const WEEKDAYS_IT = ["domenica", "lunedì", "martedì", "mercoledì", "giovedì", "venerdì", "sabato"];
@@ -738,9 +744,13 @@ function encountersForStats(scope) {
   });
 }
 
-function statCard(label, value) {
+function statCard(label, value, iconName = "", tone = "peach") {
+  const iconHtml = iconName
+    ? `<span class="stat-icon stat-icon-${tone}" data-icon="${iconName}">${icons[iconName] || ""}</span>`
+    : "";
   return `
     <article class="metric-card stat-card">
+      ${iconHtml}
       <p>${label}</p>
       <strong>${value}</strong>
     </article>
@@ -778,12 +788,13 @@ function renderTopPartners(items) {
 }
 
 function renderMoodChart(items) {
+  const chart = $("#moodChart");
+  const axis = $("#moodAxis");
+  if (!chart) return;
   const chronological = [...items]
     .filter((item) => Number(item.mood || 0) > 0)
     .sort((a, b) => a.date.localeCompare(b.date))
     .slice(-MOOD_CHART_LIMIT);
-  const chart = $("#moodChart");
-  const axis = $("#moodAxis");
   const max = 5;
 
   if (!chronological.length) {
@@ -908,7 +919,7 @@ function renderPartners() {
             <div class="partner-head">
               ${avatarHtml(partner)}
               <div class="partner-head-main">
-                <strong class="partner-name private-text">${escapeHtml(partner.alias || partner.name)}</strong>
+                <button type="button" class="partner-name private-text partner-link" data-partner-link="${partner.id}">${escapeHtml(partner.alias || partner.name)}</button>
                 ${revisitBadge(partner)}
               </div>
               ${avg !== null
@@ -955,6 +966,7 @@ function renderPartners() {
     addLongPress(card, () => openPartnerDialog(card.dataset.partnerId));
   });
   bindTagFilters($("#partnerList"));
+  bindPartnerLinks($("#partnerList"));
 }
 
 function renderCalendar() {
@@ -1027,6 +1039,7 @@ function bindEventCards(root = document) {
     addLongPress(card, () => openEncounterDialog(card.dataset.encounterId));
   });
   bindTagFilters(root);
+  bindPartnerLinks(root);
 }
 
 function addLongPress(el, onLongPress, duration = 500) {
@@ -1091,7 +1104,7 @@ function eventCard(item) {
     <article class="event-card" data-encounter-id="${item.id}">
       <div class="event-top">
         <span class="event-date meta">${fullDate(item.date)}</span>
-        <strong class="event-name private-text">${escapeHtml(partnerDisplay(partner))}</strong>
+        <button type="button" class="event-name private-text partner-link" data-partner-link="${partner?.id || ""}">${escapeHtml(partnerDisplay(partner))}</button>
         <span class="event-mood">${mood > 0 ? renderStarsInline(mood) : ""}</span>
       </div>
       ${statusRow ? `<div class="tag-row status-row">${statusRow}</div>` : ""}
@@ -1142,6 +1155,24 @@ function tagsHtml(tags = [], kind = "") {
       return `<span class="pill">${safe}</span>`;
     })
     .join("");
+}
+
+function bindPartnerLinks(root) {
+  $$("[data-partner-link]", root).forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      const id = btn.dataset.partnerLink;
+      if (id) openPartnerHistory(id);
+    });
+  });
+}
+
+function openPartnerHistory(partnerId) {
+  logFilter = null;
+  const select = $("#filterPartner");
+  if (select) select.value = partnerId;
+  setTab("log");
+  renderLists();
 }
 
 function bindTagFilters(root) {

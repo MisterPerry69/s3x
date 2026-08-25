@@ -695,6 +695,79 @@ p {
   color: var(--plum);
 }
 
+/* ─── PARTNER NAME AS LINK (event / partner cards) ─── */
+
+.partner-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+  letter-spacing: inherit;
+  transition: color 0.12s;
+}
+
+.partner-link:hover {
+  color: var(--peach-deep);
+}
+
+button.event-name {
+  font-size: 1.05rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+button.partner-name {
+  font-size: 1.22rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ─── STAT CARDS (profile) ─── */
+
+.metric-card.stat-card {
+  min-height: 104px;
+  padding: 16px;
+}
+
+.stat-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  margin-bottom: 10px;
+  border-radius: 50%;
+}
+
+.stat-icon.stat-icon-peach { color: var(--peach-deep); background: var(--peach-soft); }
+.stat-icon.stat-icon-coral { color: var(--cherry); background: var(--cherry-soft); }
+.stat-icon.stat-icon-sage  { color: #3d7a55;      background: var(--sage-soft); }
+
+.stat-icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.stat-icon svg:not([fill]) {
+  stroke: currentColor;
+  stroke-width: 2;
+  fill: none;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.metric-card.stat-card strong {
+  font-size: 1.5rem;
+}
+
 /* ─── TAG INPUT SUGGESTIONS ─── */
 
 .tag-input-wrap {
