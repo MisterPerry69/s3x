@@ -20,6 +20,8 @@ const icons = {
   users: '<svg viewBox="0 0 24 24"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
   x: '<svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   star: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>',
+  trash: '<svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>',
+  upload: '<svg viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>',
 };
 
 const demoData = {
@@ -101,6 +103,9 @@ let partnerFirstMood = 0;
 let partnerFirstSafe = "";
 let partnerSort = "first-desc";
 let partnerRevisitFilter = "";
+let statsScope = "month";
+let statsCursor = new Date();
+let partnerHistoryId = "";
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector, root = document) => [...root.querySelectorAll(selector)];
@@ -162,9 +167,14 @@ function wireEvents() {
   $("#prevMonth").addEventListener("click", () => shiftMonth(-1));
   $("#nextMonth").addEventListener("click", () => shiftMonth(1));
   $("#addForSelectedDay").addEventListener("click", () => openEncounterDialog("", selectedDate));
-  $("#statsScope").addEventListener("change", renderStats);
-  $("#statsMonth").addEventListener("change", renderStats);
-  $("#statsYear").addEventListener("change", renderStats);
+  $$("#statsScopeChips button").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      statsScope = btn.dataset.scope;
+      renderStats();
+    });
+  });
+  $("#statsPrev")?.addEventListener("click", () => shiftStatsCursor(-1));
+  $("#statsNext")?.addEventListener("click", () => shiftStatsCursor(1));
   $("#exportButton").addEventListener("click", exportData);
   $("#importInput").addEventListener("change", importData);
   $("#wipeButton").addEventListener("click", wipeData);
@@ -569,16 +579,8 @@ function renderDashboard() {
 }
 
 function renderStats() {
-  const now = new Date();
-  if (!$("#statsMonth").value) {
-    $("#statsMonth").value = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`;
-  }
-  if (!$("#statsYear").value) {
-    $("#statsYear").value = now.getFullYear();
-  }
-
-  const scope = $("#statsScope").value;
-  const items = encountersForStats(scope);
+  renderStatsControls();
+  const items = encountersForStats();
   const partners = new Set(items.map((item) => item.partnerId));
   const safeItems = items.filter((item) => item.safe === "yes" || item.safe === "no");
   const safeRate = safeItems.length
@@ -590,8 +592,6 @@ function renderStats() {
     : "-";
   const firstTimes = items.filter((item) => isFirstEncounter(item)).length;
 
-  $("#statsMonth").classList.toggle("hidden", scope !== "month");
-  $("#statsYear").classList.toggle("hidden", scope !== "year");
   $("#profileSubtitle").textContent = `${items.length} incontri nel periodo selezionato`;
   $("#statsGrid").innerHTML = [
     statCard("Incontri", items.length, "calendar", "peach"),
@@ -729,19 +729,45 @@ function renderInsights() {
   }
 }
 
-function encountersForStats(scope) {
-  if (scope === "all") return sortedEncounters();
-
-  if (scope === "year") {
-    const year = Number($("#statsYear").value || new Date().getFullYear());
+function encountersForStats() {
+  if (statsScope === "all") return sortedEncounters();
+  if (statsScope === "year") {
+    const year = statsCursor.getFullYear();
     return sortedEncounters().filter((item) => parseDate(item.date).getFullYear() === year);
   }
-
-  const [year, month] = $("#statsMonth").value.split("-").map(Number);
+  const year = statsCursor.getFullYear();
+  const month = statsCursor.getMonth();
   return sortedEncounters().filter((item) => {
     const date = parseDate(item.date);
-    return date.getFullYear() === year && date.getMonth() === month - 1;
+    return date.getFullYear() === year && date.getMonth() === month;
   });
+}
+
+function renderStatsControls() {
+  $$("#statsScopeChips button").forEach((btn) =>
+    btn.classList.toggle("active", btn.dataset.scope === statsScope),
+  );
+  const nav = $("#statsNav");
+  const label = $("#statsPeriodLabel");
+  if (!nav || !label) return;
+  if (statsScope === "all") {
+    nav.classList.add("hidden");
+    return;
+  }
+  nav.classList.remove("hidden");
+  label.textContent =
+    statsScope === "month"
+      ? statsCursor.toLocaleDateString("it-IT", { month: "long", year: "numeric" })
+      : String(statsCursor.getFullYear());
+}
+
+function shiftStatsCursor(delta) {
+  if (statsScope === "month") {
+    statsCursor = new Date(statsCursor.getFullYear(), statsCursor.getMonth() + delta, 1);
+  } else if (statsScope === "year") {
+    statsCursor = new Date(statsCursor.getFullYear() + delta, 0, 1);
+  }
+  renderStats();
 }
 
 function statCard(label, value, iconName = "", tone = "peach") {
@@ -856,6 +882,29 @@ function matchesLogFilter(item) {
 }
 
 function renderLists() {
+  const logFilterRow = document.querySelector('#view-log .filter-row');
+
+  if (partnerHistoryId) {
+    const partner = getPartner(partnerHistoryId);
+    if (!partner) {
+      partnerHistoryId = "";
+    } else {
+      logFilterRow?.classList.add("hidden");
+      const encs = sortedEncounters().filter((item) => item.partnerId === partner.id);
+      const chip = `<div class="active-filter partner-history-chip">
+        <span>Storico di <strong>${escapeHtml(partnerDisplay(partner))}</strong></span>
+        <button type="button" id="exitPartnerHistory" aria-label="Esci">✕</button>
+      </div>`;
+      $("#encounterList").innerHTML =
+        chip + renderPartnerHistoryHeader(partner) + (encs.length ? encs.map(eventCard).join("") : emptyState("Nessun incontro registrato."));
+      $("#exitPartnerHistory")?.addEventListener("click", exitPartnerHistory);
+      bindEventCards($("#encounterList"));
+      return;
+    }
+  }
+
+  logFilterRow?.classList.remove("hidden");
+
   const query = $("#searchInput").value?.trim().toLowerCase() || "";
   const partnerFilter = $("#filterPartner").value;
   const items = sortedEncounters().filter((item) => {
@@ -928,16 +977,20 @@ function renderPartners() {
             </div>
             <div class="partner-stats">
               <div class="stat-block">
-                <span class="stat-label">Incontri</span>
-                <strong class="stat-number">${count}</strong>
+                <span class="stat-label">Prima volta</span>
+                ${partner.firstDate
+                  ? `<button type="button" class="stat-value date-link" data-agenda-date="${partner.firstDate}">${fullDateLong(partner.firstDate)}</button>`
+                  : `<span class="stat-value">-</span>`}
               </div>
               <div class="stat-block stat-center">
-                <span class="stat-label">Prima volta</span>
-                <span class="stat-value">${partner.firstDate ? fullDateLong(partner.firstDate) : "-"}</span>
+                <span class="stat-label">Incontri</span>
+                <button type="button" class="stat-number partner-link" data-partner-link="${partner.id}">${count}</button>
               </div>
               <div class="stat-block">
                 <span class="stat-label">Ultima volta</span>
-                <span class="stat-value">${last ? fullDateLong(last.date) : "-"}</span>
+                ${last
+                  ? `<button type="button" class="stat-value date-link" data-agenda-date="${last.date}">${fullDateLong(last.date)}</button>`
+                  : `<span class="stat-value">-</span>`}
               </div>
             </div>
             ${partner.metVia
@@ -967,6 +1020,7 @@ function renderPartners() {
   });
   bindTagFilters($("#partnerList"));
   bindPartnerLinks($("#partnerList"));
+  bindDateLinks($("#partnerList"));
 }
 
 function renderCalendar() {
@@ -1040,6 +1094,7 @@ function bindEventCards(root = document) {
   });
   bindTagFilters(root);
   bindPartnerLinks(root);
+  bindDateLinks(root);
 }
 
 function addLongPress(el, onLongPress, duration = 500) {
@@ -1103,7 +1158,7 @@ function eventCard(item) {
   return `
     <article class="event-card" data-encounter-id="${item.id}">
       <div class="event-top">
-        <span class="event-date meta">${fullDate(item.date)}</span>
+        <button type="button" class="event-date meta date-link" data-agenda-date="${item.date}">${fullDate(item.date)}</button>
         <button type="button" class="event-name private-text partner-link" data-partner-link="${partner?.id || ""}">${escapeHtml(partnerDisplay(partner))}</button>
         <span class="event-mood">${mood > 0 ? renderStarsInline(mood) : ""}</span>
       </div>
@@ -1167,12 +1222,86 @@ function bindPartnerLinks(root) {
   });
 }
 
+function bindDateLinks(root) {
+  $$("[data-agenda-date]", root).forEach((btn) => {
+    btn.addEventListener("click", (event) => {
+      event.stopPropagation();
+      openAgendaOn(btn.dataset.agendaDate);
+    });
+  });
+}
+
+function openAgendaOn(date) {
+  if (!date) return;
+  const d = parseDate(date);
+  selectedDate = date;
+  calendarCursor = new Date(d.getFullYear(), d.getMonth(), 1);
+  partnerHistoryId = "";
+  setTab("calendar");
+}
+
 function openPartnerHistory(partnerId) {
+  partnerHistoryId = partnerId;
   logFilter = null;
-  const select = $("#filterPartner");
-  if (select) select.value = partnerId;
+  const searchInput = $("#searchInput");
+  if (searchInput) searchInput.value = "";
+  const partnerFilter = $("#filterPartner");
+  if (partnerFilter) partnerFilter.value = "";
   setTab("log");
   renderLists();
+}
+
+function exitPartnerHistory() {
+  partnerHistoryId = "";
+  renderLists();
+}
+
+function renderPartnerHistoryHeader(partner) {
+  const count = state.encounters.filter((e) => e.partnerId === partner.id).length;
+  const last = sortedEncounters().find((e) => e.partnerId === partner.id);
+  const avg = partnerAvgMood(partner.id);
+  return `
+    <article class="partner-card partner-history-header">
+      <div class="partner-head">
+        ${avatarHtml(partner)}
+        <div class="partner-head-main">
+          <strong class="partner-name private-text">${escapeHtml(partner.alias || partner.name)}</strong>
+          ${revisitBadge(partner)}
+        </div>
+        ${avg !== null
+          ? `<span class="partner-avg-badge">${avg.toFixed(1).replace(".", ",")}<span class="avg-star">★</span></span>`
+          : ""}
+      </div>
+      <div class="partner-stats">
+        <div class="stat-block">
+          <span class="stat-label">Prima volta</span>
+          ${partner.firstDate
+            ? `<button type="button" class="stat-value date-link" data-agenda-date="${partner.firstDate}">${fullDateLong(partner.firstDate)}</button>`
+            : `<span class="stat-value">-</span>`}
+        </div>
+        <div class="stat-block stat-center">
+          <span class="stat-label">Incontri</span>
+          <strong class="stat-number">${count}</strong>
+        </div>
+        <div class="stat-block">
+          <span class="stat-label">Ultima volta</span>
+          ${last
+            ? `<button type="button" class="stat-value date-link" data-agenda-date="${last.date}">${fullDateLong(last.date)}</button>`
+            : `<span class="stat-value">-</span>`}
+        </div>
+      </div>
+      ${partner.metVia
+        ? `<div class="partner-metvia">
+             <span class="pill-metvia" data-static="true">
+               <span class="pill-label">Conosciuta su</span>
+               <span class="pill-value">${escapeHtml(partner.metVia)}</span>
+             </span>
+           </div>`
+        : ""}
+      ${partner.notes ? `<p class="partner-notes private-text">${escapeHtml(partner.notes)}</p>` : ""}
+      ${partner.tags?.length ? `<div class="tag-row tag-row-hashtags">${tagsHtml(partner.tags, "partner")}</div>` : ""}
+    </article>
+  `;
 }
 
 function bindTagFilters(root) {

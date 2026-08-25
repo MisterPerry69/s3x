@@ -160,13 +160,20 @@
             </div>
           </section>
           <div class="stats-controls">
-            <select id="statsScope">
-              <option value="month">Mese</option>
-              <option value="year">Anno</option>
-              <option value="all">Totale</option>
-            </select>
-            <input id="statsMonth" type="month" />
-            <input id="statsYear" type="number" min="1970" max="2100" />
+            <div class="segmented segmented-3" id="statsScopeChips" role="group" aria-label="Ambito">
+              <button type="button" data-scope="month" class="active">Mese</button>
+              <button type="button" data-scope="year">Anno</button>
+              <button type="button" data-scope="all">Totale</button>
+            </div>
+            <div class="stats-nav" id="statsNav">
+              <button class="icon-button small" id="statsPrev" type="button" aria-label="Precedente">
+                <span data-icon="left"></span>
+              </button>
+              <span class="stats-period-label" id="statsPeriodLabel"></span>
+              <button class="icon-button small" id="statsNext" type="button" aria-label="Successivo">
+                <span data-icon="right"></span>
+              </button>
+            </div>
           </div>
           <div class="metric-grid" id="statsGrid"></div>
           <section class="content-block">
@@ -181,13 +188,17 @@
             </div>
             <div class="timeline" id="periodLog"></div>
           </section>
-          <div class="settings-panel">
-            <button class="text-button" id="exportButton" type="button">Esporta dati</button>
-            <label class="import-label">
-              Importa dati
+          <div class="settings-panel settings-icons">
+            <button class="icon-button" id="exportButton" type="button" aria-label="Esporta dati" title="Esporta dati">
+              <span data-icon="save"></span>
+            </button>
+            <label class="icon-button import-icon" aria-label="Importa dati" title="Importa dati">
+              <span data-icon="upload"></span>
               <input id="importInput" type="file" accept="application/json" />
             </label>
-            <button class="danger-button" id="wipeButton" type="button">Cancella tutto</button>
+            <button class="icon-button icon-danger" id="wipeButton" type="button" aria-label="Cancella tutto" title="Cancella tutto">
+              <span data-icon="trash"></span>
+            </button>
           </div>
         </section>
       </main>

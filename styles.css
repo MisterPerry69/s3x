@@ -731,6 +731,50 @@ button.partner-name {
   white-space: nowrap;
 }
 
+.date-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  text-align: inherit;
+  transition: color 0.12s;
+}
+
+.date-link:hover {
+  color: var(--peach-deep);
+}
+
+button.stat-number {
+  border: 0;
+  background: none;
+  padding: 0;
+  font-family: inherit;
+  cursor: pointer;
+  transition: transform 0.12s;
+}
+
+button.stat-number:hover {
+  transform: scale(1.05);
+}
+
+/* ─── PARTNER HISTORY MODE ─── */
+
+.partner-history-chip {
+  background: var(--peach-soft);
+  color: var(--peach-deep);
+}
+
+.partner-history-header {
+  margin-bottom: 4px;
+}
+
+.partner-history-header .pill-metvia {
+  cursor: default;
+  pointer-events: none;
+}
+
 /* ─── STAT CARDS (profile) ─── */
 
 .metric-card.stat-card {
@@ -1305,10 +1349,42 @@ textarea {
 /* ─── STATS ─── */
 
 .stats-controls {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   margin-bottom: 18px;
+}
+
+.stats-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 4px 6px;
+}
+
+.stats-nav.hidden {
+  display: none;
+}
+
+.stats-period-label {
+  flex: 1;
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--plum);
+  text-transform: capitalize;
+}
+
+.icon-button.small {
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-xs);
+}
+
+.icon-button.small [data-icon] {
+  width: 16px;
+  height: 16px;
 }
 
 .stat-card {
@@ -1560,19 +1636,58 @@ textarea {
   cursor: pointer;
 }
 
+.settings-panel.settings-icons {
+  justify-content: center;
+  gap: 18px;
+  padding: 18px;
+}
+
+.settings-panel.settings-icons .icon-button {
+  width: 52px;
+  height: 52px;
+  color: var(--peach-deep);
+  background: var(--peach-soft);
+  box-shadow: var(--shadow-xs);
+}
+
+.settings-panel.settings-icons .icon-button [data-icon] {
+  width: 22px;
+  height: 22px;
+}
+
+.settings-panel.settings-icons .icon-button.import-icon {
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.settings-panel.settings-icons .icon-button.import-icon input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.settings-panel.settings-icons .icon-button.icon-danger {
+  color: var(--cherry);
+  background: var(--cherry-soft);
+}
+
 /* ─── TAB BAR ─── */
 
 .tabbar {
   position: fixed;
-  right: 0;
-  bottom: 0;
-  left: 0;
+  right: 12px;
+  bottom: max(12px, env(safe-area-inset-bottom, 12px));
+  left: 12px;
   z-index: 5;
   display: grid;
   grid-template-columns: repeat(5, 1fr);
   gap: 4px;
-  width: min(100%, 460px);
-  margin: 0 auto 16px;
+  width: min(calc(100% - 24px), 460px);
+  margin: 0 auto;
   padding: 9px;
   border-radius: 999px;
   background: rgba(255, 250, 243, 0.86);
