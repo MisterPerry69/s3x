@@ -24,14 +24,14 @@
 
       <main>
         <section class="view active" id="view-dashboard" aria-label="Dashboard">
-          <div class="hero-panel">
+          <button class="hero-panel" id="heroPanel" type="button">
             <div>
               <p class="eyebrow">Questo mese</p>
               <strong id="monthCount">0</strong>
               <span>incontri registrati</span>
             </div>
             <div class="sparkline" id="sparkline" aria-hidden="true"></div>
-          </div>
+          </button>
 
           <div class="metric-grid">
             <article class="metric-card">
@@ -86,9 +86,6 @@
               <input id="searchInput" type="search" placeholder="Cerca partner, tag o note" autocomplete="off" />
               <button id="clearSearch" class="clear-search hidden" type="button" aria-label="Cancella ricerca">✕</button>
             </div>
-            <select id="filterPartner">
-              <option value="">Tutti</option>
-            </select>
           </div>
           <div class="timeline" id="encounterList"></div>
         </section>
@@ -380,6 +377,16 @@
           <button class="primary-button" id="saveEntryButton" value="default" type="submit">Salva</button>
         </menu>
       </form>
+    </dialog>
+
+    <dialog id="listDialog" class="list-dialog">
+      <div class="dialog-heading">
+        <h2 id="listDialogTitle">Elenco</h2>
+        <button class="icon-button" id="closeListDialogButton" type="button" aria-label="Chiudi">
+          <span data-icon="x"></span>
+        </button>
+      </div>
+      <div class="list-dialog-body" id="listDialogBody"></div>
     </dialog>
 
     <div class="photo-lightbox hidden" id="photoLightbox" aria-hidden="true">

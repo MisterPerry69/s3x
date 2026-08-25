@@ -163,7 +163,6 @@ function wireEvents() {
     renderLists();
     updateClearSearch();
   });
-  $("#filterPartner").addEventListener("change", renderLists);
   $("#prevMonth").addEventListener("click", () => shiftMonth(-1));
   $("#nextMonth").addEventListener("click", () => shiftMonth(1));
   $("#addForSelectedDay").addEventListener("click", () => openEncounterDialog("", selectedDate));
@@ -221,8 +220,41 @@ function wireEvents() {
   attachTagSuggestions($("#encounterTags"), $("#encounterTagsSuggestions"));
 
   wireLightbox();
+  wireListDialog();
+  wireDashboardActions();
 
   buildStarRating();
+}
+
+function wireListDialog() {
+  $("#closeListDialogButton")?.addEventListener("click", () => $("#listDialog")?.close());
+  const dlg = $("#listDialog");
+  dlg?.addEventListener("click", (event) => {
+    // Close when clicking on the backdrop (dialog element itself, not its inner content)
+    if (event.target === dlg) dlg.close();
+  });
+}
+
+function wireDashboardActions() {
+  $("#heroPanel")?.addEventListener("click", () => {
+    const now = new Date();
+    const items = sortedEncounters().filter((item) => isSameMonth(parseDate(item.date), now));
+    openEncounterListModal(`Incontri di ${now.toLocaleDateString("it-IT", { month: "long" })}`, items);
+  });
+}
+
+function openEncounterListModal(title, items) {
+  const body = items.length ? items.map(eventCard).join("") : emptyState("Nessun incontro.");
+  openListModal(title, body, { bindCards: true });
+}
+
+function openListModal(title, htmlContent, { bindCards = false, onOpen = null } = {}) {
+  $("#listDialogTitle").textContent = title;
+  const body = $("#listDialogBody");
+  body.innerHTML = htmlContent;
+  if (bindCards) bindEventCards(body);
+  if (onOpen) onOpen(body);
+  $("#listDialog").showModal();
 }
 
 function updateFirstTimeControlsVisibility() {
@@ -595,15 +627,83 @@ function renderStats() {
   $("#profileSubtitle").textContent = `${items.length} incontri nel periodo selezionato`;
   $("#statsGrid").innerHTML = [
     statCard("Incontri", items.length, "calendar", "peach"),
-    statCard("Partner", partners.size, "users", "coral"),
+    statCard("Partner", partners.size, "users", "coral", "partner"),
     statCard("Voto medio", moodAverage, "star", "peach"),
     statCard("Protetti", `${safeRate}%`, "shield", "sage"),
-    statCard("Prime volte", firstTimes, "heart", "coral"),
-    statCard("Tag diversi", uniqueTags(items).size, "note", "peach"),
+    statCard("Prime volte", firstTimes, "heart", "coral", "first"),
+    statCard("Tag diversi", uniqueTags(items).size, "note", "peach", "tags"),
   ].join("");
+  bindStatCardActions(items);
 
   renderTopPartners(items);
   renderPeriodLog(items);
+}
+
+function bindStatCardActions(items) {
+  $$("#statsGrid [data-stat-action]").forEach((card) => {
+    card.addEventListener("click", () => {
+      const action = card.dataset.statAction;
+      if (action === "partner") openPartnerListModal("Partner del periodo", items);
+      else if (action === "first") openEncounterListModal("Prime volte nel periodo", items.filter((i) => i.firstTime === true));
+      else if (action === "tags") openTagListModal("Tag nel periodo", items);
+    });
+  });
+}
+
+function openPartnerListModal(title, items) {
+  const partnerIds = [...new Set(items.map((i) => i.partnerId))];
+  const partners = partnerIds.map(getPartner).filter(Boolean);
+  const html = partners.length
+    ? `<div class="partner-grid modal-partner-grid">${partners
+        .map(
+          (p) => `
+            <button type="button" class="modal-partner-tile" data-modal-partner="${p.id}">
+              ${avatarHtml(p)}
+              <span class="modal-partner-name">${escapeHtml(partnerDisplay(p))}</span>
+            </button>
+          `,
+        )
+        .join("")}</div>`
+    : emptyState("Nessun partner nel periodo.");
+  openListModal(title, html, {
+    onOpen: (body) => {
+      body.querySelectorAll("[data-modal-partner]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          $("#listDialog").close();
+          openPartnerHistory(btn.dataset.modalPartner);
+        });
+      });
+    },
+  });
+}
+
+function openTagListModal(title, items) {
+  const counts = new Map();
+  for (const enc of items) for (const t of enc.tags || []) counts.set(t, (counts.get(t) || 0) + 1);
+  const sorted = [...counts.entries()].sort((a, b) => b[1] - a[1]);
+  const html = sorted.length
+    ? `<div class="tag-row tag-row-hashtags modal-tag-row">${sorted
+        .map(
+          ([tag, count]) => `
+            <button type="button" class="pill pill-tag modal-tag" data-modal-tag="${escapeHtml(tag)}">
+              ${escapeHtml(tag)}<span class="modal-tag-count">${count}</span>
+            </button>
+          `,
+        )
+        .join("")}</div>`
+    : emptyState("Nessun tag nel periodo.");
+  openListModal(title, html, {
+    onOpen: (body) => {
+      body.querySelectorAll("[data-modal-tag]").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          $("#listDialog").close();
+          logFilter = { type: "tag", value: btn.dataset.modalTag };
+          setTab("log");
+          renderLists();
+        });
+      });
+    },
+  });
 }
 
 function renderPeriodLog(items) {
@@ -632,6 +732,8 @@ function computeInsights() {
       emoji: "📅",
       title: `Giorno preferito: ${WEEKDAYS_IT[topDay[0]]}`,
       detail: `${topDay[1]} incontri capitano di ${WEEKDAYS_IT[topDay[0]]}`,
+      action: "weekday",
+      weekday: Number(topDay[0]),
     });
   }
 
@@ -723,6 +825,16 @@ function renderInsights() {
       $("#miniInsightTitle").textContent = pick.title;
       $("#miniInsightDetail").textContent = pick.detail;
       mini.classList.remove("hidden");
+      if (pick.action === "weekday") {
+        mini.classList.add("clickable");
+        mini.onclick = () => {
+          const items = sortedEncounters().filter((item) => parseDate(item.date).getDay() === pick.weekday);
+          openEncounterListModal(`Incontri di ${WEEKDAYS_IT[pick.weekday]}`, items);
+        };
+      } else {
+        mini.classList.remove("clickable");
+        mini.onclick = null;
+      }
     } else {
       mini.classList.add("hidden");
     }
@@ -770,16 +882,19 @@ function shiftStatsCursor(delta) {
   renderStats();
 }
 
-function statCard(label, value, iconName = "", tone = "peach") {
+function statCard(label, value, iconName = "", tone = "peach", action = "") {
   const iconHtml = iconName
     ? `<span class="stat-icon stat-icon-${tone}" data-icon="${iconName}">${icons[iconName] || ""}</span>`
     : "";
+  const tag = action ? "button" : "article";
+  const extra = action ? ` type="button" data-stat-action="${action}"` : "";
+  const cls = action ? "metric-card stat-card clickable" : "metric-card stat-card";
   return `
-    <article class="metric-card stat-card">
+    <${tag} class="${cls}"${extra}>
       ${iconHtml}
       <p>${label}</p>
       <strong>${value}</strong>
-    </article>
+    </${tag}>
   `;
 }
 
@@ -906,15 +1021,10 @@ function renderLists() {
   logFilterRow?.classList.remove("hidden");
 
   const query = $("#searchInput").value?.trim().toLowerCase() || "";
-  const partnerFilter = $("#filterPartner").value;
   const items = sortedEncounters().filter((item) => {
     const partner = getPartner(item.partnerId);
     const haystack = [partner?.name, partner?.alias, item.notes, ...(item.tags || [])].join(" ").toLowerCase();
-    return (
-      (!partnerFilter || item.partnerId === partnerFilter) &&
-      (!query || haystack.includes(query)) &&
-      matchesLogFilter(item)
-    );
+    return (!query || haystack.includes(query)) && matchesLogFilter(item);
   });
 
   const filterChip = logFilter
@@ -1063,13 +1173,9 @@ function renderCalendar() {
 }
 
 function renderPartnerOptions() {
-  const selectOptions = state.partners
-    .map((partner) => `<option value="${partner.id}">${escapeHtml(partnerLabel(partner))}</option>`)
-    .join("");
   const suggestions = state.partners
     .map((partner) => `<option value="${escapeHtml(partnerLabel(partner))}"></option>`)
     .join("");
-  $("#filterPartner").innerHTML = '<option value="">Tutti</option>' + selectOptions;
   $("#partnerSuggestions").innerHTML = suggestions;
 
   const defaults = ["Tinder", "Instagram", "Hinge", "Bumble", "Dal vivo", "Tramite amici"];
@@ -1245,8 +1351,6 @@ function openPartnerHistory(partnerId) {
   logFilter = null;
   const searchInput = $("#searchInput");
   if (searchInput) searchInput.value = "";
-  const partnerFilter = $("#filterPartner");
-  if (partnerFilter) partnerFilter.value = "";
   setTab("log");
   renderLists();
 }
@@ -1290,16 +1394,6 @@ function renderPartnerHistoryHeader(partner) {
             : `<span class="stat-value">-</span>`}
         </div>
       </div>
-      ${partner.metVia
-        ? `<div class="partner-metvia">
-             <span class="pill-metvia" data-static="true">
-               <span class="pill-label">Conosciuta su</span>
-               <span class="pill-value">${escapeHtml(partner.metVia)}</span>
-             </span>
-           </div>`
-        : ""}
-      ${partner.notes ? `<p class="partner-notes private-text">${escapeHtml(partner.notes)}</p>` : ""}
-      ${partner.tags?.length ? `<div class="tag-row tag-row-hashtags">${tagsHtml(partner.tags, "partner")}</div>` : ""}
     </article>
   `;
 }
@@ -1502,6 +1596,7 @@ function setTab(tab) {
   if (tab === "profile") renderStats();
   if (tab === "partners") renderPartners();
   document.body.dataset.tab = tab;
+  window.scrollTo({ top: 0, behavior: "instant" });
 }
 
 function openEncounterDialog(id = "", date = "") {
